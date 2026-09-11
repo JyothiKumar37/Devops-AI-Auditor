@@ -1,0 +1,48 @@
+# Reusable: Terraform validation, but only when the repository actually contains
+# Terraform. The auditor project ships no Terraform of its own today, so this job
+# detects *.tf files and skips gracefully when there are none - and validates
+# automatically if any are added later. GitHub-hosted ubuntu runners ship the
+# terraform CLI, so no extra setup action is required.
+name: Terraform validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: Validate Terraform (if present)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Detect Terraform files
+        id: detect
+        run: |
+          if find . -path ./node_modules -prune -o -name '*.tf' -print | grep -q .; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No Terraform files found; skipping validation."
+          fi
+
+      - name: Format check
+        if: steps.detect.outputs.present == 'true'
+        run: terraform fmt -check -recursive
+
+      - name: Init & validate each module
+        if: steps.detect.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          dirs=$(find . -name '*.tf' -not -path '*/.terraform/*' -printf '%h\n' | sort -u)
+          for dir in $dirs; do
+            echo "::group::Validating $dir"
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+            echo "::endgroup::"
+          done

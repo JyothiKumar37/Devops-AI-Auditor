@@ -1,0 +1,60 @@
+# Release: triggered by pushing a semantic version tag (e.g. v1.2.3). Runs the
+# quality gate, publishes version-tagged container images to GHCR, and creates a
+# GitHub Release with auto-generated notes. No hardcoded secrets: the built-in
+# GITHUB_TOKEN is used for both GHCR and the release.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    uses: ./.github/workflows/reusable-backend.yml
+
+  frontend:
+    uses: ./.github/workflows/reusable-frontend.yml
+
+  security:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/reusable-security.yml
+
+  # Publish version-tagged images (semver + git SHA + latest) after checks pass.
+  docker-publish:
+    needs: [backend, frontend, security]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      push: true
+
+  github-release:
+    name: Publish GitHub release
+    needs: [docker-publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Create release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

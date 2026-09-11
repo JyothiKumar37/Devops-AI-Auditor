@@ -1,0 +1,21 @@
+# Keep Docker build contexts small and reproducible.
+**/.venv
+**/venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+frontend/dist
+.git
+.gitignore
+*.md
+!backend/README.md
+.env
+.env.*
+!.env.example
+reports/*
+!reports/.gitkeep
+postgres-data
+redis-data

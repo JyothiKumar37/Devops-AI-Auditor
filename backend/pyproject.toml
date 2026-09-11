@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devops-ai-auditor-backend"
+version = "0.1.0"
+description = "Backend API and agent orchestration for the DevOps AI Repository Auditor."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+
+dependencies = [
+    "fastapi==0.115.5",
+    "uvicorn[standard]==0.32.1",
+    "pydantic==2.10.3",
+    "pydantic-settings==2.6.1",
+    "structlog==24.4.0",
+    "SQLAlchemy==2.0.36",
+    "asyncpg==0.30.0",
+    "redis==5.2.0",
+    "celery==5.4.0",
+    "langgraph==0.2.53",
+    "httpx==0.28.0",
+    "python-multipart==0.0.19",
+    "PyYAML==6.0.2",
+    "python-hcl2==4.3.5",
+    "reportlab==4.2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "ruff==0.8.2",
+    "mypy==1.13.0",
+    "types-PyYAML==6.0.12.20240917",
+    "aiosqlite==0.20.0",
+    "pip-audit==2.7.3",
+]
+
+[tool.setuptools.packages.find]
+# The project uses top-level package directories (api, agents, ...) rather than
+# a single src package. Discover them and all their subpackages (api.v1,
+# services.ingestion, ...) so non-editable installs (Docker) include everything.
+where = ["."]
+include = [
+    "api*",
+    "agents*",
+    "scanners*",
+    "models*",
+    "services*",
+    "core*",
+    "workers*",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The HTML report renderer embeds a CSS stylesheet as a string literal; wrapping
+# those declaration lines would harm readability more than the long lines do.
+"services/report/html_report.py" = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI idiomatically uses these callables as default argument values.
+extend-immutable-calls = [
+    "fastapi.File",
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Form",
+    "fastapi.Body",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+# Type-check the application code; tests use fixtures/among dynamic helpers that
+# are intentionally not fully annotated.
+exclude = ["^tests/"]

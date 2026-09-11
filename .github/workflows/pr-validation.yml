@@ -1,0 +1,50 @@
+# PR validation: the full quality gate for every pull request into main.
+# Fast feedback, no publishing. Docker images are built (verification) but never
+# pushed. Superseded runs on the same PR are cancelled.
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: read-only by default; the security job elevates itself.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    uses: ./.github/workflows/reusable-backend.yml
+
+  frontend:
+    uses: ./.github/workflows/reusable-frontend.yml
+
+  security:
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/reusable-security.yml
+
+  dependencies:
+    uses: ./.github/workflows/reusable-dependencies.yml
+
+  terraform:
+    uses: ./.github/workflows/reusable-terraform.yml
+
+  docker-build:
+    uses: ./.github/workflows/reusable-docker.yml
+    with:
+      push: false
+
+  # Single required status check that aggregates the blocking jobs.
+  pr-validation:
+    name: PR validation passed
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, security, dependencies, terraform, docker-build]
+    steps:
+      - name: Report success
+        run: echo "All PR validation checks passed."
