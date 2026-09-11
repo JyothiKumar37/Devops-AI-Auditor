@@ -408,7 +408,11 @@ class ScanService:
         self._session.add(scan)
         await self._session.commit()
 
-        workspace = self._workspaces.create(scan.id)
+        # Capture the id up front: after a failed flush the ORM instance's
+        # attributes are expired, and reading scan.id then would trigger a lazy
+        # load on a broken session (masking the real error).
+        scan_id = scan.id
+        workspace = self._workspaces.create(scan_id)
         try:
             self._save_upload(upload_stream, workspace.upload_path)
 
@@ -455,20 +459,20 @@ class ScanService:
 
             logger.info(
                 "scan_completed",
-                scan_id=str(scan.id),
+                scan_id=str(scan_id),
                 files=len(discovery.files),
                 findings=len(findings),
             )
             return scan, len(discovery.files)
         except AppError as exc:
-            await self._fail_scan(scan, exc.message)
+            await self._fail_scan(scan_id, exc.message)
             raise
         except ArchiveValidationError as exc:
-            await self._fail_scan(scan, str(exc))
+            await self._fail_scan(scan_id, str(exc))
             raise InvalidArchiveError(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - record unexpected failures too
-            logger.error("scan_failed", scan_id=str(scan.id), error=str(exc))
-            await self._fail_scan(scan, "Internal error during ingestion.")
+            logger.error("scan_failed", scan_id=str(scan_id), error=str(exc))
+            await self._fail_scan(scan_id, "Internal error during ingestion.")
             raise
         finally:
             # Always remove the extracted repository and raw upload.
@@ -476,11 +480,13 @@ class ScanService:
 
     # -- internals -----------------------------------------------------------
 
-    async def _fail_scan(self, scan: Scan, message: str) -> None:
+    async def _fail_scan(self, scan_id: uuid.UUID, message: str) -> None:
         # Roll back any half-applied unit of work before recording the failure,
         # so the failed-status update commits cleanly on its own.
         await self._session.rollback()
-        scan = await self._session.get(Scan, scan.id) or scan
+        scan = await self._session.get(Scan, scan_id)
+        if scan is None:
+            return
         scan.status = ScanStatus.FAILED
         scan.completed_at = _utcnow()
         scan.error_message = message[:2000]

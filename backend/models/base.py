@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func
+from sqlalchemy import DateTime, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import CHAR, TypeDecorator
@@ -45,13 +45,19 @@ class GUID(TypeDecorator):
 
 
 class TimestampMixin:
-    """Adds created/updated timestamp columns managed by the database."""
+    """Adds created/updated timestamp columns managed by the database.
+
+    Columns are timezone-aware (``timestamptz`` on PostgreSQL) so the
+    application's UTC-aware datetimes bind correctly under asyncpg.
+    """
 
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,

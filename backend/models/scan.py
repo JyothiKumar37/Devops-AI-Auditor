@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import JSON, BigInteger, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import GUID, Base, TimestampMixin
@@ -32,8 +32,8 @@ class Scan(Base, TimestampMixin):
         index=True,
     )
     # created_at is provided by TimestampMixin.
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Cross-stack entity index produced during ingestion, used for correlation.
     correlation_index: Mapped[dict | None] = mapped_column(JSON, nullable=True)
