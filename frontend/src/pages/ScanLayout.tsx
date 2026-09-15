@@ -51,7 +51,7 @@ export default function ScanLayout() {
             className={({ isActive }) =>
               `-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
                 isActive
-                  ? "border-brand text-slate-900"
+                  ? "border-brand text-brand"
                   : "border-transparent text-slate-500 hover:text-slate-800"
               }`
             }

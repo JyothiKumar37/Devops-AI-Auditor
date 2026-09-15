@@ -4,17 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Single restrained accent used for links, active states and focus.
-        accent: {
-          DEFAULT: "#2563eb",
-          muted: "#3b82f6",
-          deep: "#1d4ed8",
-        },
-        // Kept as an alias so existing `brand` utilities resolve to the accent.
+        // Primary brand: a rich indigo→violet family used for gradients,
+        // active states, focus rings and key call-to-action surfaces.
         brand: {
-          DEFAULT: "#2563eb",
-          muted: "#3b82f6",
-          deep: "#1d4ed8",
+          DEFAULT: "#4f46e5",
+          muted: "#6366f1",
+          deep: "#4338ca",
+        },
+        accent: {
+          DEFAULT: "#4f46e5",
+          muted: "#6366f1",
+          deep: "#4338ca",
         },
       },
       fontFamily: {
@@ -23,12 +23,16 @@ export default {
       },
       boxShadow: {
         card: "0 1px 2px 0 rgba(16, 24, 40, 0.04), 0 1px 3px 0 rgba(16, 24, 40, 0.06)",
-        "card-hover": "0 4px 12px -2px rgba(16, 24, 40, 0.10), 0 2px 6px -2px rgba(16, 24, 40, 0.06)",
+        "card-hover": "0 10px 24px -6px rgba(16, 24, 40, 0.12), 0 4px 10px -4px rgba(16, 24, 40, 0.07)",
+        brand: "0 10px 26px -10px rgba(79, 70, 229, 0.55)",
+        "brand-lg": "0 22px 48px -18px rgba(79, 70, 229, 0.55)",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+        "brand-gradient": "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+        "hero-gradient":
+          "linear-gradient(120deg, #4338ca 0%, #6d28d9 48%, #7c3aed 100%)",
         "grid-faint":
-          "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+          "linear-gradient(to right, rgba(255,255,255,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.10) 1px, transparent 1px)",
       },
       keyframes: {
         "fade-rise": {

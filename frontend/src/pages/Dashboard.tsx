@@ -19,30 +19,41 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="card animate-in relative overflow-hidden p-6 sm:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-grid-faint [background-size:32px_32px] opacity-40" />
+      <div className="animate-in relative overflow-hidden rounded-2xl bg-hero-gradient p-6 text-white shadow-brand-lg sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-grid-faint [background-size:34px_34px] opacity-40" />
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-fuchsia-400/20 blur-3xl" />
         <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="max-w-xl">
-            <span className="chip bg-brand/15 text-brand ring-brand/30">Security &amp; readiness</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white ring-1 ring-inset ring-white/25">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" aria-hidden />
+              Security &amp; readiness
+            </span>
             <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
-              <span className="text-gradient">Ship infrastructure with confidence.</span>
+              Ship infrastructure with confidence.
             </h1>
-            <p className="mt-2 text-sm text-slate-500">
+            <p className="mt-2 max-w-lg text-sm text-indigo-100">
               Continuous auditing of Docker, Kubernetes, Terraform, CI/CD and secrets — with
               AI-grounded reasoning and a production-readiness score.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              <Link to="/scan/new" className="btn-primary">
+              <Link
+                to="/scan/new"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50"
+              >
                 <Icon path="M12 4v16m8-8H4" />
                 New Scan
               </Link>
-              <Link to="/scans" className="btn-ghost">
+              <Link
+                to="/scans"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 bg-white/10 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+              >
                 View history
               </Link>
             </div>
           </div>
           {data ? (
-            <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <div className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-xl ring-1 ring-black/5">
               <ScoreRing score={Math.round(data.average_readiness)} size={112} />
               <div>
                 <p className="section-title">Avg readiness</p>
@@ -63,23 +74,25 @@ export default function Dashboard() {
             <StatCard
               label="Total scans"
               value={data.total_scans}
+              tone="indigo"
               icon={<Icon path="M4 6h16M4 12h16M4 18h16" />}
             />
             <StatCard
               label="Repositories"
               value={data.repositories_scanned}
+              tone="violet"
               icon={<Icon path="M3 7h18M3 12h18M3 17h18" />}
             />
             <StatCard
               label="Critical issues"
               value={data.critical_issues}
-              accent="text-rose-600"
+              tone="rose"
               icon={<Icon path="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z" />}
             />
             <StatCard
               label="High issues"
               value={data.high_issues}
-              accent="text-orange-600"
+              tone="amber"
               icon={<Icon path="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z" />}
             />
           </div>

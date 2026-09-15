@@ -21,7 +21,12 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background-color: #f6f7f9;
+  background-color: #f7f8fc;
+  background-image:
+    radial-gradient(44rem 32rem at 100% -8%, rgba(124, 58, 237, 0.08), transparent 60%),
+    radial-gradient(40rem 30rem at -8% 6%, rgba(79, 70, 229, 0.08), transparent 55%),
+    radial-gradient(36rem 30rem at 50% 120%, rgba(14, 165, 233, 0.05), transparent 60%);
+  background-attachment: fixed;
 }
 
 /* Refined scrollbars for the enterprise feel. */
@@ -69,12 +74,15 @@ body {
       transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-slate-900 text-white shadow-sm hover:bg-slate-800
-      focus-visible:outline-slate-900;
+    @apply btn bg-brand-gradient text-white shadow-brand transition
+      hover:shadow-brand-lg hover:brightness-[1.06];
+  }
+  .btn-dark {
+    @apply btn bg-slate-900 text-white shadow-sm hover:bg-slate-800;
   }
   .btn-ghost {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50
-      hover:text-slate-900;
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:border-slate-400
+      hover:bg-slate-50 hover:text-slate-900;
   }
   .btn-subtle {
     @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900;
@@ -84,10 +92,11 @@ body {
       ring-1 ring-inset;
   }
   .text-gradient {
-    @apply bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text
+      text-transparent;
   }
   .brand-text {
-    @apply text-slate-900;
+    @apply bg-brand-gradient bg-clip-text text-transparent;
   }
   .section-title {
     @apply text-xs font-semibold uppercase tracking-[0.12em] text-slate-500;
