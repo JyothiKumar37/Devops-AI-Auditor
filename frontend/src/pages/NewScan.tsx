@@ -9,7 +9,7 @@ export default function NewScan() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="New Scan"
-        subtitle="Upload a repository archive to run a full security and readiness audit."
+        subtitle="Upload a repository — a ZIP archive or a project folder — to run a full security and readiness audit."
       />
       <UploadPanel onUploaded={(scan) => navigate(`/scans/${scan.id}`)} />
 
