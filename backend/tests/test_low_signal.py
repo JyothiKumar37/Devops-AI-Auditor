@@ -39,6 +39,17 @@ def test_low_signal_path_detection() -> None:
     assert not is_low_signal_path("backend/.env")
 
 
+def test_low_signal_covers_scripts_and_seed_utilities() -> None:
+    # Seed/e2e/smoke utility scripts carry throwaway credentials by convention.
+    assert is_low_signal_path("scripts/e2e.mjs")
+    assert is_low_signal_path("scripts/smoke.mjs")
+    assert is_low_signal_path("scripts/oversell.mjs")
+    assert is_low_signal_path("packages/database/seed.js")
+    # Real application source under src/ is still treated as production.
+    assert not is_low_signal_path("apps/api-gateway/src/server.js")
+    assert not is_low_signal_path("packages/database/client.js")
+
+
 def test_non_secret_scanner_finding_downranked_in_template() -> None:
     # A HIGH Kubernetes finding in a *.example.yaml manifest is capped to LOW.
     ranked = downrank_if_low_signal(_rf("k8s/ecom-secrets.example.yaml"))

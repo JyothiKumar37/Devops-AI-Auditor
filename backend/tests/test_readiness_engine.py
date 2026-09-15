@@ -100,6 +100,22 @@ def test_many_lower_severity_findings_do_not_floor_a_category() -> None:
     assert one_critical.score < many_medium.score
 
 
+def test_weak_core_category_blocks_readiness_without_criticals() -> None:
+    files = [{"file_type": "dockerfile"}]
+    # A dozen high-severity security findings, zero criticals: the overall
+    # weighted average still clears 70, but Security is driven below the floor.
+    findings = [
+        _f(str(i), severity="high", category="security", scanner="secret-scanner")
+        for i in range(12)
+    ]
+    result = assess(findings, files)
+    security = next(c for c in result.category_scores if c.category == "security")
+    assert security.score < 50
+    assert result.score >= 70  # overall average alone would look "ready"
+    assert result.ready is False  # but the weak category holds it back
+    assert "readiness floor" in result.summary
+
+
 def test_confidence_reduces_penalty() -> None:
     files = [{"file_type": "dockerfile"}]
     high_conf = assess([_f("1", severity="high", category="security", confidence="high")], files)

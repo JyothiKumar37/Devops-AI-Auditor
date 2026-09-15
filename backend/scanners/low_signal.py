@@ -17,21 +17,33 @@ from scanners.finding import RuleFinding
 
 # Filename suffixes that mark a file as a template rather than live config.
 _TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist")
-# Path segments that mark non-production code (tests, fixtures, examples, docs).
+# Path segments that mark non-production code: tests, fixtures, examples, docs,
+# and the conventional home of seed/smoke/e2e utility scripts.
 _NON_PROD_SEGMENTS = {
     "test", "tests", "__tests__", "__mocks__", "spec", "specs", "e2e",
     "fixture", "fixtures", "mock", "mocks", "example", "examples",
-    "sample", "samples", "docs",
+    "sample", "samples", "docs", "scripts",
+}
+# Filename stems (before the extension) of non-production utility scripts that
+# carry throwaway/seed credentials by convention - e.g. `seed.js`, `e2e.mjs`,
+# `smoke.mjs`, `oversell.mjs`, `benchmark.ts`.
+_NON_PROD_NAME_STEMS = {
+    "seed", "seeds", "e2e", "smoke", "oversell", "benchmark", "bench", "demo",
+    "fixture", "fixtures",
 }
 
 
 def is_low_signal_path(file_path: str) -> bool:
-    """True for template/sample env files and test/fixture/docs paths."""
+    """True for template/sample env files, test/fixture/docs paths and seed scripts."""
     path = PurePosixPath(file_path)
     name = path.name.lower()
     if name.endswith(_TEMPLATE_SUFFIXES):
         return True
     if any(marker in name for marker in (".example.", ".sample.", ".template.")):
+        return True
+    # The filename stem (portion before the first dot) identifies seed/e2e/smoke
+    # utility scripts wherever they live in the tree.
+    if name.split(".", 1)[0] in _NON_PROD_NAME_STEMS:
         return True
     return bool({segment.lower() for segment in path.parts} & _NON_PROD_SEGMENTS)
 

@@ -48,6 +48,10 @@ _CATEGORY_WEIGHT = {
 _CATEGORY_ORDER = list(_CATEGORY_WEIGHT)
 _ALWAYS_APPLICABLE = {"security", "reliability", "observability", "maintainability"}
 
+# Minimum score every applicable category must reach for the repo to be "ready".
+# Prevents a high overall average from masking one badly failing core area.
+_READY_CATEGORY_FLOOR = 50
+
 # Health/probe rules represent observability rather than raw reliability.
 _OBSERVABILITY_RULES = {"K8S020", "K8S021", "K8S022", "DCK012", "DCMP008"}
 _SECURITY_CATEGORIES = {"security", "secrets", "supply_chain"}
@@ -156,19 +160,37 @@ def assess(findings: list[dict[str, Any]], files: list[dict[str, Any]]) -> Produ
          f.get("recommendation")]
     )[:8]
 
-    ready = not critical and overall >= 70
+    # A core area scoring far below the overall still blocks readiness even with
+    # no criticals: a repo can average well yet be unshippable because (say)
+    # Security is riddled with high-severity issues.
+    weak = [
+        (cs.category, cs.score)
+        for cs in category_scores
+        if cs.applicable and cs.score < _READY_CATEGORY_FLOOR
+    ]
+    weak.sort(key=lambda cs: cs[1])
+    ready = not critical and overall >= 70 and not weak
+
     summary = (
         f"Production readiness: {overall}/100. "
         f"{'Ready' if ready else 'Not ready'} for production — "
         f"{len(critical)} critical, {len(high)} high severity findings."
     )
+    if not critical and overall >= 70 and weak:
+        category, cat_score = weak[0]
+        summary += (
+            f" Held back by the {category} category ({cat_score}/100, below the "
+            f"{_READY_CATEGORY_FLOOR}-point readiness floor)."
+        )
     explanation = (
         "Overall score is the weighted average of the applicable category scores "
         f"({', '.join(sorted(applicable))}). Each category starts at 100 and loses "
         "severity-weighted, confidence-adjusted points per finding (critical=45, "
         "high=22, medium=9, low=3, info=1). Repeated findings of the same severity "
         "apply diminishing penalties, so a large volume of lower-severity issues "
-        "cannot drive a category to zero unless critical issues are present."
+        "cannot drive a category to zero unless critical issues are present. A repo "
+        f"is only 'ready' with no criticals, an overall score of 70+, and every "
+        f"applicable category at or above {_READY_CATEGORY_FLOOR}/100."
     )
 
     return ProductionReadiness(

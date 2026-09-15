@@ -103,6 +103,22 @@ def test_duplicate_secret_across_files() -> None:
     group = next(g for g in correlate(findings, {}) if "multiple files" in g.root_cause)
     assert set(group.affected_files) == {"a.env", "b.env"}
     assert set(group.member_finding_ids) == {"s1", "s2"}
+    assert group.severity.value == "critical"  # derived from the member findings
+
+
+def test_duplicate_secret_severity_follows_members() -> None:
+    # The same secret duplicated only across down-ranked (LOW) test files is a
+    # LOW cross-file risk, not a hardcoded HIGH one.
+    findings = [
+        {"id": "t1", "scanner": "secret-scanner", "rule_id": "SEC010", "category": "secrets",
+         "severity": "low", "evidence": "Pass****123!", "file": "a.test.js", "line": 1,
+         "title": "cred"},
+        {"id": "t2", "scanner": "secret-scanner", "rule_id": "SEC010", "category": "secrets",
+         "severity": "low", "evidence": "Pass****123!", "file": "b.test.js", "line": 1,
+         "title": "cred"},
+    ]
+    group = next(g for g in correlate(findings, {}) if "multiple files" in g.root_cause)
+    assert group.severity.value == "low"
 
 
 def test_kubernetes_wiring_grouping() -> None:

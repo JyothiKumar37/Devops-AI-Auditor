@@ -158,14 +158,20 @@ def _domain_sections(findings: list[ReportFinding]) -> list[DomainSection]:
 
 
 def _remediation_plan(findings: list[ReportFinding]) -> list[RemediationStep]:
-    """Group findings by rule and order the fixes by severity then prevalence."""
-    grouped: dict[str, dict[str, Any]] = {}
+    """Group findings by (rule, severity) and order fixes by severity then prevalence.
+
+    Grouping on severity as well as rule keeps down-ranked findings (e.g. secrets
+    in template/test files, capped to LOW) out of the higher-severity rows for
+    the same rule, so the plan reflects the true priority of each file.
+    """
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for f in findings:
         if not f.recommendation:
             continue
         entry = grouped.setdefault(
-            f.rule_id,
+            (f.rule_id, f.severity),
             {
+                "rule_id": f.rule_id,
                 "action": f.recommendation,
                 "severity": f.severity,
                 "files": [],
@@ -173,23 +179,21 @@ def _remediation_plan(findings: list[ReportFinding]) -> list[RemediationStep]:
             },
         )
         entry["count"] += 1
-        if _severity_rank(f.severity) > _severity_rank(entry["severity"]):
-            entry["severity"] = f.severity
         if f.file and f.file not in entry["files"]:
             entry["files"].append(f.file)
 
     ordered = sorted(
-        grouped.items(),
-        key=lambda kv: (-_severity_rank(kv[1]["severity"]), -kv[1]["count"], kv[0]),
+        grouped.values(),
+        key=lambda e: (-_severity_rank(e["severity"]), -e["count"], e["rule_id"]),
     )
     plan: list[RemediationStep] = []
-    for priority, (rule_id, entry) in enumerate(ordered, start=1):
+    for priority, entry in enumerate(ordered, start=1):
         plan.append(
             RemediationStep(
                 priority=priority,
                 severity=entry["severity"],
                 action=entry["action"],
-                affected_rule_ids=[rule_id],
+                affected_rule_ids=[entry["rule_id"]],
                 affected_files=sorted(entry["files"]),
                 finding_count=entry["count"],
             )

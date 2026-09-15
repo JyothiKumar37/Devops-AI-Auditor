@@ -176,6 +176,22 @@ def test_remediation_plan_ordered_by_severity() -> None:
     assert model.remediation_plan[0].severity == "critical"
 
 
+def test_remediation_plan_splits_same_rule_by_severity() -> None:
+    # A rule that fires at HIGH in prod and LOW in a template/test file must not
+    # roll the low-signal file up into the HIGH row.
+    scan = _scan()
+    findings = [
+        _finding(rule_id="SEC009", severity="high", category="secrets",
+                 scanner="secret-scanner", title="DB password", file_id=None),
+        _finding(rule_id="SEC009", severity="low", category="secrets",
+                 scanner="secret-scanner", title="DB password", file_id=None),
+    ]
+    model = build_report_model(scan, findings, {}, [{"file_type": "env"}], _audit_report())
+    sec_steps = [s for s in model.remediation_plan if s.affected_rule_ids == ["SEC009"]]
+    assert {s.severity for s in sec_steps} == {"high", "low"}
+    assert all(s.finding_count == 1 for s in sec_steps)
+
+
 def test_detailed_findings_include_evidence_and_location() -> None:
     model = _build()
     tf = next(f for f in model.detailed_findings if f.rule_id == "TF004")

@@ -220,7 +220,10 @@ def _duplicate_secrets(findings: list[dict[str, Any]]) -> list[FindingGroup]:
             FindingGroup(
                 root_cause="The same secret is committed in multiple files",
                 category=FindingCategory.SECRETS,
-                severity=Severity.HIGH,
+                # Derived from the member findings so a secret duplicated only
+                # across template/test files (down-ranked to LOW) is not reported
+                # as a HIGH cross-file risk.
+                severity=_max_severity(members),
                 confidence=Confidence.MEDIUM,
                 affected_files=files,
                 evidence=[f"Masked value {evidence} appears in: {', '.join(files)}"],
