@@ -11,6 +11,7 @@ const TABS = [
   { to: "findings", label: "Findings" },
   { to: "files", label: "Files" },
   { to: "readiness", label: "Readiness" },
+  { to: "report", label: "Report" },
 ];
 
 export default function ScanLayout() {

@@ -61,6 +61,13 @@ export function prettyLabel(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Health color for a 0-100 score (green / amber / red).
+export function scoreColor(score: number): string {
+  if (score >= 75) return "#22c55e";
+  if (score >= 50) return "#f59e0b";
+  return "#f43f5e";
+}
+
 // Map detected file types to a Monaco language id.
 export function monacoLanguage(fileType: string, path: string): string {
   if (fileType === "dockerfile") return "dockerfile";

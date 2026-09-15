@@ -8,6 +8,7 @@ import type {
   FindingsResponse,
   RemediationProposal,
   RemediationResult,
+  ReportModel,
   RepositoryFileContent,
   ScanFilesResponse,
   ScanListResponse,
@@ -53,6 +54,14 @@ export function useReport(scanId: string | null) {
   return useQuery<AuditReport>({
     queryKey: ["report", scanId],
     queryFn: () => api.getReport(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useReportModel(scanId: string | null) {
+  return useQuery<ReportModel>({
+    queryKey: ["report-model", scanId],
+    queryFn: () => api.getReportModel(scanId as string),
     enabled: Boolean(scanId),
   });
 }

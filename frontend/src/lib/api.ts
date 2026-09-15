@@ -11,6 +11,7 @@ import type {
   HealthResponse,
   RemediationProposal,
   RemediationResult,
+  ReportModel,
   RepositoryFileContent,
   ScanFilesResponse,
   ScanListResponse,
@@ -135,8 +136,11 @@ export const api = {
   /** Fetch the AI reasoning report (production readiness, groups, recommendations). */
   getReport: (id: string) => request<AuditReport>(`${API_V1}/scans/${id}/report`),
   /** URL that exports the full audit report in the given format (json|html|pdf). */
-  reportExportUrl: (id: string, format: "json" | "html" | "pdf") =>
-    `${API_V1}/scans/${id}/report/export?format=${format}`,
+  reportExportUrl: (id: string, format: "json" | "html" | "pdf", download = true) =>
+    `${API_V1}/scans/${id}/report/export?format=${format}&download=${download}`,
+  /** Fetch the full structured report model for in-app viewing. */
+  getReportModel: (id: string) =>
+    request<ReportModel>(`${API_V1}/scans/${id}/report/export?format=json&download=false`),
   /** Generate a proposed fix for a finding (no changes are made). */
   generateRemediation: (scanId: string, findingId: string) =>
     post<RemediationProposal>(`${API_V1}/scans/${scanId}/findings/${findingId}/remediation`),

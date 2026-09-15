@@ -212,6 +212,113 @@ export interface FindingFilters {
   file_type?: string;
 }
 
+// ---- Report model (services/report/model.py) ----
+
+export interface ReportFinding {
+  id: string;
+  rule_id: string;
+  scanner: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  description: string;
+  file: string | null;
+  line: number | null;
+  evidence: string | null;
+  recommendation: string;
+}
+
+export interface SeverityBucket {
+  severity: string;
+  label: string;
+  count: number;
+  findings: ReportFinding[];
+}
+
+export interface DomainSection {
+  key: string;
+  label: string;
+  count: number;
+  findings: ReportFinding[];
+}
+
+export interface CrossFileRisk {
+  root_cause: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  affected_files: string[];
+  evidence: string[];
+  impact: string;
+  recommendation: string;
+}
+
+export interface RemediationStep {
+  priority: number;
+  severity: string;
+  action: string;
+  affected_rule_ids: string[];
+  affected_files: string[];
+  finding_count: number;
+}
+
+export interface ReportCategoryScore {
+  category: string;
+  label: string;
+  score: number;
+  weight: number;
+  applicable: boolean;
+  findings: number;
+  explanation: string;
+}
+
+export interface ReadinessSection {
+  score: number;
+  ready: boolean;
+  rating: string;
+  summary: string;
+  confidence: string;
+  category_scores: ReportCategoryScore[];
+  blockers: string[];
+  top_risks: string[];
+  next_actions: string[];
+  explanation: string;
+}
+
+export interface RepositoryInfo {
+  name: string;
+  scan_id: string;
+  source_type: string;
+  status: string;
+  created_at: string | null;
+  completed_at: string | null;
+  total_files: number;
+  file_type_counts: Record<string, number>;
+  technologies: string[];
+  components: string[];
+}
+
+export interface ReportModel {
+  schema_version: string;
+  report_id: string;
+  generated_at: string;
+  title: string;
+  repository: RepositoryInfo;
+  executive_summary: string;
+  llm_used: boolean;
+  production_readiness: ReadinessSection;
+  total_findings: number;
+  reviewed_false_positives: number;
+  severity_summary: Record<string, number>;
+  issues_by_severity: SeverityBucket[];
+  findings_by_domain: DomainSection[];
+  cross_file_risks: CrossFileRisk[];
+  remediation_plan: RemediationStep[];
+  recommendations: string[];
+  detailed_findings: ReportFinding[];
+}
+
 // ---- Remediation ----
 
 export type RemediationStatus = "proposed" | "manual_required";

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -16,12 +16,17 @@ body,
 
 body {
   margin: 0;
-  background-color: #0b1120;
   color: #e2e8f0;
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background-color: #070b16;
+  background-image:
+    radial-gradient(60rem 60rem at 12% -10%, rgba(56, 189, 248, 0.10), transparent 60%),
+    radial-gradient(50rem 50rem at 110% 10%, rgba(99, 102, 241, 0.12), transparent 55%),
+    radial-gradient(40rem 40rem at 50% 120%, rgba(14, 165, 233, 0.08), transparent 60%);
+  background-attachment: fixed;
 }
 
 /* Refined scrollbars for the enterprise feel. */
@@ -33,28 +38,68 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.22);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.38);
   background-clip: content-box;
 }
 
 *:focus-visible {
   outline: 2px solid #38bdf8;
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-white/10 bg-slate-900/50 shadow-sm;
+    @apply rounded-2xl border border-white/[0.07] bg-slate-900/40 shadow-card backdrop-blur-xl;
+  }
+  .card-hover {
+    @apply transition duration-200 hover:border-white/15 hover:bg-slate-900/60
+      hover:shadow-[0_24px_50px_-28px_rgba(56,189,248,0.35)];
+  }
+  .panel {
+    @apply rounded-xl border border-white/[0.06] bg-white/[0.02];
   }
   .input {
     @apply rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-200
       placeholder:text-slate-500 focus:border-brand/60 focus:outline-none;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold
+      transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-gradient text-white shadow-[0_8px_24px_-10px_rgba(56,189,248,0.6)]
+      hover:brightness-110;
+  }
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.03] text-slate-200 hover:bg-white/[0.08];
+  }
+  .btn-subtle {
+    @apply btn text-slate-300 hover:bg-white/[0.06] hover:text-white;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium
+      ring-1 ring-inset;
+  }
+  .text-gradient {
+    @apply bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent;
+  }
+  .brand-text {
+    @apply bg-brand-gradient bg-clip-text text-transparent;
+  }
+  .section-title {
+    @apply text-xs font-semibold uppercase tracking-[0.14em] text-slate-500;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: fade-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
