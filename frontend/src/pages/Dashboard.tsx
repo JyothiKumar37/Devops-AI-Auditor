@@ -27,7 +27,7 @@ export default function Dashboard() {
             <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">
               <span className="text-gradient">Ship infrastructure with confidence.</span>
             </h1>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-slate-500">
               Continuous auditing of Docker, Kubernetes, Terraform, CI/CD and secrets — with
               AI-grounded reasoning and a production-readiness score.
             </p>
@@ -42,11 +42,11 @@ export default function Dashboard() {
             </div>
           </div>
           {data ? (
-            <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-slate-950/40 p-5">
+            <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <ScoreRing score={Math.round(data.average_readiness)} size={112} />
               <div>
                 <p className="section-title">Avg readiness</p>
-                <p className="mt-1 text-sm text-slate-400">across completed scans</p>
+                <p className="mt-1 text-sm text-slate-500">across completed scans</p>
               </div>
             </div>
           ) : null}
@@ -73,20 +73,20 @@ export default function Dashboard() {
             <StatCard
               label="Critical issues"
               value={data.critical_issues}
-              accent="text-rose-400"
+              accent="text-rose-600"
               icon={<Icon path="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z" />}
             />
             <StatCard
               label="High issues"
               value={data.high_issues}
-              accent="text-orange-400"
+              accent="text-orange-600"
               icon={<Icon path="M12 9v4m0 4h.01M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L14.7 3.9a2 2 0 00-3.4 0z" />}
             />
           </div>
 
           <Card className="animate-in overflow-hidden">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-white">Latest scans</h2>
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5">
+              <h2 className="text-sm font-semibold text-slate-900">Latest scans</h2>
               <Link to="/scans" className="text-xs font-medium text-brand hover:underline">
                 View all
               </Link>
@@ -106,7 +106,7 @@ export default function Dashboard() {
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/5 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-5 py-2.5 font-medium">Repository</th>
                     <th className="px-5 py-2.5 font-medium">Status</th>
                     <th className="px-5 py-2.5 font-medium">Files</th>
@@ -117,12 +117,12 @@ export default function Dashboard() {
                   {data.latest_scans.map((scan) => (
                     <tr
                       key={scan.id}
-                      className="border-b border-white/5 transition last:border-0 hover:bg-white/[0.04]"
+                      className="border-b border-slate-200 transition last:border-0 hover:bg-slate-50"
                     >
                       <td className="px-5 py-3">
                         <Link
                           to={`/scans/${scan.id}`}
-                          className="font-medium text-slate-100 hover:text-brand"
+                          className="font-medium text-slate-900 hover:text-brand"
                         >
                           {scan.repository_name}
                         </Link>
@@ -130,8 +130,8 @@ export default function Dashboard() {
                       <td className="px-5 py-3">
                         <ScanStatusBadge status={scan.status} />
                       </td>
-                      <td className="px-5 py-3 text-slate-400">{scan.file_count}</td>
-                      <td className="px-5 py-3 text-slate-400">{relativeTime(scan.created_at)}</td>
+                      <td className="px-5 py-3 text-slate-500">{scan.file_count}</td>
+                      <td className="px-5 py-3 text-slate-500">{relativeTime(scan.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -52,11 +52,11 @@ function FindingRow({ f }: { f: ReportFinding }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
       >
         <span className={`h-2 w-2 shrink-0 rounded-full ${meta.dot}`} aria-hidden />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-slate-100">{f.title}</span>
+          <span className="block truncate text-sm font-medium text-slate-900">{f.title}</span>
           <span className="mt-0.5 block truncate font-mono text-[11px] text-slate-500">
             {f.file ?? "—"}
             {f.line ? `:${f.line}` : ""}
@@ -75,16 +75,16 @@ function FindingRow({ f }: { f: ReportFinding }) {
         </svg>
       </button>
       {open ? (
-        <div className="space-y-3 border-t border-white/5 px-4 py-3">
-          {f.description ? <p className="text-sm text-slate-300">{f.description}</p> : null}
+        <div className="space-y-3 border-t border-slate-200 px-4 py-3">
+          {f.description ? <p className="text-sm text-slate-700">{f.description}</p> : null}
           {f.evidence ? (
-            <pre className="overflow-x-auto rounded-lg border border-white/10 bg-slate-950/70 p-3 font-mono text-xs text-amber-200">
+            <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800">
               {f.evidence}
             </pre>
           ) : null}
           {f.recommendation ? (
-            <p className="text-sm text-slate-300">
-              <span className="font-semibold text-slate-200">Recommendation: </span>
+            <p className="text-sm text-slate-700">
+              <span className="font-semibold text-slate-800">Recommendation: </span>
               {f.recommendation}
             </p>
           ) : null}
@@ -106,7 +106,7 @@ function ListCard({ title, items, tone }: { title: string; items: string[]; tone
       <p className={`section-title ${tone}`}>{title}</p>
       <ul className="mt-3 space-y-2">
         {items.map((item, i) => (
-          <li key={i} className="flex gap-2 text-sm text-slate-300">
+          <li key={i} className="flex gap-2 text-sm text-slate-700">
             <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-40" />
             <span>{item}</span>
           </li>
@@ -122,10 +122,10 @@ function CrossFileCard({ risk }: { risk: CrossFileRisk }) {
     <Card className="p-5">
       <div className="flex items-start gap-2">
         <span className={`chip ${meta.badge}`}>{meta.label}</span>
-        <h3 className="text-sm font-semibold text-white">{risk.root_cause}</h3>
+        <h3 className="text-sm font-semibold text-slate-900">{risk.root_cause}</h3>
       </div>
-      <p className="mt-2 text-sm text-slate-300">
-        <span className="font-medium text-slate-200">Impact: </span>
+      <p className="mt-2 text-sm text-slate-700">
+        <span className="font-medium text-slate-800">Impact: </span>
         {risk.impact}
       </p>
       {risk.affected_files.length ? (
@@ -133,15 +133,15 @@ function CrossFileCard({ risk }: { risk: CrossFileRisk }) {
           <p className="section-title">Affected files</p>
           <ul className="mt-1 space-y-0.5">
             {risk.affected_files.slice(0, 8).map((file) => (
-              <li key={file} className="truncate font-mono text-[11px] text-slate-400">
+              <li key={file} className="truncate font-mono text-[11px] text-slate-500">
                 {file}
               </li>
             ))}
           </ul>
         </div>
       ) : null}
-      <p className="mt-3 text-sm text-slate-300">
-        <span className="font-medium text-slate-200">Recommendation: </span>
+      <p className="mt-3 text-sm text-slate-700">
+        <span className="font-medium text-slate-800">Recommendation: </span>
         {risk.recommendation}
       </p>
     </Card>
@@ -152,7 +152,7 @@ function SeverityDistribution({ model }: { model: ReportModel }) {
   const total = model.total_findings || 1;
   return (
     <div>
-      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-white/5">
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-slate-50">
         {SEVERITY_ORDER.map((sev) => {
           const count = model.severity_summary[sev] ?? 0;
           if (count === 0) return null;
@@ -168,10 +168,10 @@ function SeverityDistribution({ model }: { model: ReportModel }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
         {SEVERITY_ORDER.map((sev) => (
-          <span key={sev} className="flex items-center gap-1.5 text-xs text-slate-400">
+          <span key={sev} className="flex items-center gap-1.5 text-xs text-slate-500">
             <span className={`h-2 w-2 rounded-full ${SEVERITY_META[sev]?.dot ?? "bg-slate-500"}`} />
             {SEVERITY_META[sev]?.label ?? sev}
-            <span className="font-semibold text-slate-200">
+            <span className="font-semibold text-slate-800">
               {model.severity_summary[sev] ?? 0}
             </span>
           </span>
@@ -214,7 +214,7 @@ export default function ReportView() {
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-white">Audit Report</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Audit Report</h1>
           <p className="mt-0.5 text-xs text-slate-500">
             Generated {formatDateTime(model.generated_at)} · schema v{model.schema_version}
             {model.llm_used ? " · AI-assisted" : " · deterministic"}
@@ -226,13 +226,13 @@ export default function ReportView() {
       {/* Hero: score + executive summary */}
       <Card className="animate-in overflow-hidden">
         <div className="grid gap-6 p-6 md:grid-cols-[auto_1fr]">
-          <div className="flex flex-col items-center justify-center gap-3 md:border-r md:border-white/10 md:pr-6">
+          <div className="flex flex-col items-center justify-center gap-3 md:border-r md:border-slate-200 md:pr-6">
             <ScoreRing score={pr.score} />
             <span
               className={`chip ${
                 pr.ready
-                  ? "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30"
-                  : "bg-rose-500/15 text-rose-300 ring-rose-500/30"
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                  : "bg-rose-50 text-rose-700 ring-rose-600/20"
               }`}
             >
               {pr.ready ? "Production Ready" : "Not Production Ready"}
@@ -241,7 +241,7 @@ export default function ReportView() {
           </div>
           <div className="min-w-0">
             <p className="section-title">Executive Summary</p>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">{model.executive_summary}</p>
+            <p className="mt-2 text-sm leading-relaxed text-slate-700">{model.executive_summary}</p>
             <div className="mt-4">
               <SeverityDistribution model={model} />
             </div>
@@ -264,7 +264,7 @@ export default function ReportView() {
             ].map(([k, v]) => (
               <div key={k}>
                 <dt className="text-xs text-slate-500">{k}</dt>
-                <dd className="truncate font-medium text-slate-200">{v}</dd>
+                <dd className="truncate font-medium text-slate-800">{v}</dd>
               </div>
             ))}
           </dl>
@@ -273,7 +273,7 @@ export default function ReportView() {
               <p className="section-title">Technologies</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {model.repository.technologies.map((t) => (
-                  <span key={t} className="chip bg-white/5 text-slate-300 ring-white/10">
+                  <span key={t} className="chip bg-slate-50 text-slate-700 ring-slate-200">
                     {t}
                   </span>
                 ))}
@@ -291,7 +291,7 @@ export default function ReportView() {
               {applicable.map((c) => (
                 <div key={c.category}>
                   <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="text-slate-300">{c.label}</span>
+                    <span className="text-slate-700">{c.label}</span>
                     <span className="font-semibold" style={{ color: scoreColor(c.score) }}>
                       {c.score}
                     </span>
@@ -307,16 +307,16 @@ export default function ReportView() {
       {/* Blockers / risks / next actions */}
       {pr.blockers.length || pr.top_risks.length || pr.next_actions.length ? (
         <div className="grid gap-6 lg:grid-cols-3">
-          <ListCard title="Production Blockers" items={pr.blockers} tone="text-rose-300" />
-          <ListCard title="Top Risks" items={pr.top_risks} tone="text-orange-300" />
-          <ListCard title="Recommended Next Actions" items={pr.next_actions} tone="text-sky-300" />
+          <ListCard title="Production Blockers" items={pr.blockers} tone="text-rose-700" />
+          <ListCard title="Top Risks" items={pr.top_risks} tone="text-orange-700" />
+          <ListCard title="Recommended Next Actions" items={pr.next_actions} tone="text-sky-700" />
         </div>
       ) : null}
 
       {/* Remediation plan */}
       {model.remediation_plan.length ? (
         <Card className="animate-in overflow-hidden">
-          <div className="border-b border-white/10 px-6 py-4">
+          <div className="border-b border-slate-200 px-6 py-4">
             <SectionHeading title="Recommended remediation plan" />
           </div>
           <div className="divide-y divide-white/5">
@@ -324,15 +324,15 @@ export default function ReportView() {
               const meta = severityMeta(step.severity);
               return (
                 <div key={step.priority} className="flex items-center gap-4 px-6 py-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/5 text-xs font-bold text-slate-300">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-50 text-xs font-bold text-slate-700">
                     {step.priority}
                   </span>
                   <span className={`chip ${meta.badge}`}>{meta.label}</span>
-                  <span className="min-w-0 flex-1 text-sm text-slate-200">{step.action}</span>
+                  <span className="min-w-0 flex-1 text-sm text-slate-800">{step.action}</span>
                   <span className="hidden font-mono text-[11px] text-slate-500 md:inline">
                     {step.affected_rule_ids.join(", ")}
                   </span>
-                  <span className="chip bg-white/5 text-slate-400 ring-white/10">
+                  <span className="chip bg-slate-50 text-slate-500 ring-slate-200">
                     {step.finding_count}×
                   </span>
                 </div>
@@ -379,7 +379,7 @@ export default function ReportView() {
                     className={`chip capitalize ${
                       active
                         ? "bg-brand/20 text-brand ring-brand/40"
-                        : "bg-white/5 text-slate-400 ring-white/10 hover:text-slate-200"
+                        : "bg-slate-50 text-slate-500 ring-slate-200 hover:text-slate-800"
                     }`}
                   >
                     {sev} {count}

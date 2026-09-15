@@ -1,11 +1,11 @@
 import type { ScanStatus } from "@/types/api";
 
 const STATUS_STYLES: Record<ScanStatus, string> = {
-  pending: "bg-slate-500/15 text-slate-300 ring-slate-500/30",
-  running: "bg-sky-500/15 text-sky-300 ring-sky-500/30",
-  completed: "bg-emerald-500/15 text-emerald-300 ring-emerald-500/30",
-  failed: "bg-rose-500/15 text-rose-300 ring-rose-500/30",
-  cancelled: "bg-amber-500/15 text-amber-300 ring-amber-500/30",
+  pending: "bg-slate-100 text-slate-600 ring-slate-500/20",
+  running: "bg-sky-50 text-sky-700 ring-sky-600/20",
+  completed: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
+  failed: "bg-rose-50 text-rose-700 ring-rose-600/20",
+  cancelled: "bg-amber-50 text-amber-700 ring-amber-600/20",
 };
 
 export function ScanStatusBadge({ status }: { status: ScanStatus }) {

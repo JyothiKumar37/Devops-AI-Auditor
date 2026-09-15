@@ -6,9 +6,9 @@ import { CATEGORY_META, SEVERITY_ORDER, severityMeta } from "@/lib/format";
 import type { DiscoveryCategory } from "@/types/api";
 
 function readinessColor(score: number): string {
-  if (score >= 80) return "text-emerald-400";
-  if (score >= 60) return "text-amber-400";
-  return "text-rose-400";
+  if (score >= 80) return "text-emerald-600";
+  if (score >= 60) return "text-amber-600";
+  return "text-rose-600";
 }
 
 export default function ScanOverview() {
@@ -24,7 +24,7 @@ export default function ScanOverview() {
       <Card className="p-8">
         <div className="flex flex-col items-center gap-3 text-center">
           <Spinner label={`Scan ${scan.status}…`} />
-          <p className="max-w-md text-sm text-slate-400">
+          <p className="max-w-md text-sm text-slate-500">
             Discovering files, running deterministic scanners, detecting secrets and correlating
             findings. This view will update automatically.
           </p>
@@ -70,7 +70,7 @@ export default function ScanOverview() {
           </div>
           <div className="grid grid-cols-5 gap-3">
             {SEVERITY_ORDER.map((sev) => (
-              <div key={sev} className="rounded-lg border border-white/5 bg-slate-950/40 p-3 text-center">
+              <div key={sev} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
                 <p className={`text-2xl font-semibold ${severityMeta(sev).text}`}>
                   {report.severity_counts[sev] ?? 0}
                 </p>
@@ -93,7 +93,7 @@ export default function ScanOverview() {
           <div className="flex flex-wrap gap-2">
             {report.understanding.technologies.length ? (
               report.understanding.technologies.map((t) => (
-                <Badge key={t} className="bg-white/5 text-slate-300 ring-white/10">
+                <Badge key={t} className="bg-slate-50 text-slate-700 ring-slate-200">
                   {t}
                 </Badge>
               ))
@@ -108,7 +108,7 @@ export default function ScanOverview() {
             {activeCats.map((c) => {
               const meta = CATEGORY_META[c];
               return (
-                <span key={c} className="text-xs text-slate-400">
+                <span key={c} className="text-xs text-slate-500">
                   <span className={`rounded px-1.5 py-0.5 ring-1 ring-inset ${meta?.accent ?? ""}`}>
                     {meta?.label ?? c}
                   </span>{" "}
@@ -130,7 +130,7 @@ export default function ScanOverview() {
               {report.finding_groups.slice(0, 5).map((g) => (
                 <li key={g.root_cause} className="flex items-start gap-2 text-sm">
                   <SeverityPill severity={g.severity} />
-                  <span className="text-slate-300">{g.root_cause}</span>
+                  <span className="text-slate-700">{g.root_cause}</span>
                 </li>
               ))}
             </ul>

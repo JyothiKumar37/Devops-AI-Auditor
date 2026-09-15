@@ -29,9 +29,9 @@ export function CodeViewer({ scanId, fileId, path, fileType, highlightLine }: Co
           range: new monaco.Range(highlightLine, 1, highlightLine, 1),
           options: {
             isWholeLine: true,
-            className: "bg-amber-400/15",
-            marginClassName: "bg-amber-400/40",
-            linesDecorationsClassName: "border-l-2 border-amber-400",
+            className: "bg-amber-100",
+            marginClassName: "bg-amber-200",
+            linesDecorationsClassName: "border-l-2 border-amber-500",
           },
         },
       ]);
@@ -62,7 +62,7 @@ export function CodeViewer({ scanId, fileId, path, fileType, highlightLine }: Co
   }
   if (isError || !data) {
     return (
-      <div className="grid h-full min-h-[24rem] place-items-center text-sm text-rose-300">
+      <div className="grid h-full min-h-[24rem] place-items-center text-sm text-rose-700">
         Could not load this file.
       </div>
     );
@@ -79,7 +79,7 @@ export function CodeViewer({ scanId, fileId, path, fileType, highlightLine }: Co
     <Editor
       key={fileId}
       height="100%"
-      theme="vs-dark"
+      theme="light"
       language={monacoLanguage(fileType ?? data.file_type, path ?? data.path)}
       value={data.content}
       onMount={onMount}

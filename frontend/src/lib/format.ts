@@ -42,14 +42,14 @@ export function relativeTime(iso: string | null): string {
 export const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"] as const;
 
 export const SEVERITY_META: Record<string, { label: string; text: string; badge: string; dot: string }> = {
-  critical: { label: "Critical", text: "text-rose-300", badge: "bg-rose-500/15 text-rose-300 ring-rose-500/30", dot: "bg-rose-500" },
-  high: { label: "High", text: "text-orange-300", badge: "bg-orange-500/15 text-orange-300 ring-orange-500/30", dot: "bg-orange-500" },
-  medium: { label: "Medium", text: "text-amber-300", badge: "bg-amber-500/15 text-amber-300 ring-amber-500/30", dot: "bg-amber-500" },
-  low: { label: "Low", text: "text-sky-300", badge: "bg-sky-500/15 text-sky-300 ring-sky-500/30", dot: "bg-sky-500" },
-  info: { label: "Info", text: "text-slate-300", badge: "bg-slate-500/15 text-slate-300 ring-slate-500/30", dot: "bg-slate-500" },
+  critical: { label: "Critical", text: "text-rose-700", badge: "bg-rose-50 text-rose-700 ring-rose-600/20", dot: "bg-rose-500" },
+  high: { label: "High", text: "text-orange-700", badge: "bg-orange-50 text-orange-700 ring-orange-600/20", dot: "bg-orange-500" },
+  medium: { label: "Medium", text: "text-amber-700", badge: "bg-amber-50 text-amber-700 ring-amber-600/20", dot: "bg-amber-500" },
+  low: { label: "Low", text: "text-sky-700", badge: "bg-sky-50 text-sky-700 ring-sky-600/20", dot: "bg-sky-500" },
+  info: { label: "Info", text: "text-slate-600", badge: "bg-slate-100 text-slate-600 ring-slate-500/20", dot: "bg-slate-400" },
 };
 
-const _INFO_META = { label: "Info", text: "text-slate-300", badge: "bg-slate-500/15 text-slate-300 ring-slate-500/30", dot: "bg-slate-500" };
+const _INFO_META = { label: "Info", text: "text-slate-600", badge: "bg-slate-100 text-slate-600 ring-slate-500/20", dot: "bg-slate-400" };
 
 export function severityMeta(severity: string) {
   return SEVERITY_META[severity] ?? _INFO_META;
@@ -61,11 +61,12 @@ export function prettyLabel(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Health color for a 0-100 score (green / amber / red).
+// Health color for a 0-100 score (green / amber / red), tuned for contrast on
+// a white background.
 export function scoreColor(score: number): string {
-  if (score >= 75) return "#22c55e";
-  if (score >= 50) return "#f59e0b";
-  return "#f43f5e";
+  if (score >= 75) return "#16a34a";
+  if (score >= 50) return "#d97706";
+  return "#dc2626";
 }
 
 // Map detected file types to a Monaco language id.
@@ -91,19 +92,19 @@ interface CategoryMeta {
 
 // Display metadata for each discovery category.
 export const CATEGORY_META: Record<DiscoveryCategory, CategoryMeta> = {
-  docker: { label: "Docker", accent: "text-sky-300 ring-sky-500/30 bg-sky-500/10" },
-  compose: { label: "Docker Compose", accent: "text-cyan-300 ring-cyan-500/30 bg-cyan-500/10" },
-  kubernetes: { label: "Kubernetes", accent: "text-blue-300 ring-blue-500/30 bg-blue-500/10" },
-  terraform: { label: "Terraform", accent: "text-violet-300 ring-violet-500/30 bg-violet-500/10" },
-  cicd: { label: "CI/CD", accent: "text-amber-300 ring-amber-500/30 bg-amber-500/10" },
-  helm: { label: "Helm", accent: "text-teal-300 ring-teal-500/30 bg-teal-500/10" },
-  ansible: { label: "Ansible", accent: "text-rose-300 ring-rose-500/30 bg-rose-500/10" },
-  shell: { label: "Shell", accent: "text-emerald-300 ring-emerald-500/30 bg-emerald-500/10" },
+  docker: { label: "Docker", accent: "text-sky-700 ring-sky-600/20 bg-sky-50" },
+  compose: { label: "Docker Compose", accent: "text-cyan-700 ring-cyan-600/20 bg-cyan-50" },
+  kubernetes: { label: "Kubernetes", accent: "text-blue-700 ring-blue-600/20 bg-blue-50" },
+  terraform: { label: "Terraform", accent: "text-violet-700 ring-violet-600/20 bg-violet-50" },
+  cicd: { label: "CI/CD", accent: "text-amber-700 ring-amber-600/20 bg-amber-50" },
+  helm: { label: "Helm", accent: "text-teal-700 ring-teal-600/20 bg-teal-50" },
+  ansible: { label: "Ansible", accent: "text-rose-700 ring-rose-600/20 bg-rose-50" },
+  shell: { label: "Shell", accent: "text-emerald-700 ring-emerald-600/20 bg-emerald-50" },
   configuration: {
     label: "Configuration",
-    accent: "text-indigo-300 ring-indigo-500/30 bg-indigo-500/10",
+    accent: "text-indigo-700 ring-indigo-600/20 bg-indigo-50",
   },
-  other: { label: "Other", accent: "text-slate-300 ring-slate-500/30 bg-slate-500/10" },
+  other: { label: "Other", accent: "text-slate-600 ring-slate-500/20 bg-slate-100" },
 };
 
 export const CATEGORY_ORDER: DiscoveryCategory[] = [

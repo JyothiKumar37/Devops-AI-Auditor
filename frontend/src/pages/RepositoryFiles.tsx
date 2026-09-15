@@ -33,7 +33,7 @@ export default function RepositoryFiles() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr]">
       <Card className="flex max-h-[36rem] flex-col overflow-hidden">
-        <div className="border-b border-white/10 p-3">
+        <div className="border-b border-slate-200 p-3">
           <input
             className="input w-full"
             placeholder="Filter files…"
@@ -52,11 +52,11 @@ export default function RepositoryFiles() {
                   key={f.id}
                   onClick={() => setSelected(f)}
                   className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs transition ${
-                    active?.id === f.id ? "bg-brand/10 text-brand" : "text-slate-400 hover:bg-white/5"
+                    active?.id === f.id ? "bg-brand/10 text-brand" : "text-slate-500 hover:bg-slate-50"
                   }`}
                 >
                   <span className="truncate font-mono">{f.path}</span>
-                  <span className="shrink-0 text-slate-600">{formatBytes(f.size)}</span>
+                  <span className="shrink-0 text-slate-400">{formatBytes(f.size)}</span>
                 </button>
               ))}
             </div>
@@ -65,7 +65,7 @@ export default function RepositoryFiles() {
       </Card>
 
       <Card className="flex min-h-[36rem] flex-col overflow-hidden">
-        <div className="border-b border-white/10 px-4 py-2.5 font-mono text-xs text-slate-400">
+        <div className="border-b border-slate-200 px-4 py-2.5 font-mono text-xs text-slate-500">
           {active?.path ?? "Select a file"}
         </div>
         <div className="flex-1">

@@ -4,15 +4,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: {
-          DEFAULT: "#0b1120",
-          soft: "#0f172a",
-          softer: "#1e293b",
+        // Single restrained accent used for links, active states and focus.
+        accent: {
+          DEFAULT: "#2563eb",
+          muted: "#3b82f6",
+          deep: "#1d4ed8",
         },
+        // Kept as an alias so existing `brand` utilities resolve to the accent.
         brand: {
-          DEFAULT: "#38bdf8",
-          muted: "#0ea5e9",
-          deep: "#6366f1",
+          DEFAULT: "#2563eb",
+          muted: "#3b82f6",
+          deep: "#1d4ed8",
         },
       },
       fontFamily: {
@@ -20,13 +22,13 @@ export default {
         mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       boxShadow: {
-        card: "0 1px 0 0 rgba(255,255,255,0.05) inset, 0 20px 40px -24px rgba(2,6,23,0.9)",
-        glow: "0 0 0 1px rgba(56,189,248,0.25), 0 8px 40px -8px rgba(56,189,248,0.35)",
+        card: "0 1px 2px 0 rgba(16, 24, 40, 0.04), 0 1px 3px 0 rgba(16, 24, 40, 0.06)",
+        "card-hover": "0 4px 12px -2px rgba(16, 24, 40, 0.10), 0 2px 6px -2px rgba(16, 24, 40, 0.06)",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)",
+        "brand-gradient": "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
         "grid-faint":
-          "linear-gradient(to right, rgba(148,163,184,0.06) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,0.06) 1px, transparent 1px)",
+          "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
       },
       keyframes: {
         "fade-rise": {

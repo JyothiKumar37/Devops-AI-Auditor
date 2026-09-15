@@ -23,7 +23,7 @@ export function ReportExportMenu({
 }) {
   if (disabled) {
     return (
-      <span className="text-xs font-medium text-slate-600">Report available once scan completes</span>
+      <span className="text-xs font-medium text-slate-400">Report available once scan completes</span>
     );
   }
   return (
@@ -42,13 +42,13 @@ export function ReportExportMenu({
         </svg>
         View report
       </Link>
-      <div className="flex overflow-hidden rounded-lg border border-white/10">
+      <div className="flex overflow-hidden rounded-lg border border-slate-200">
         {FORMATS.map(({ format, label }, index) => (
           <a
             key={format}
             href={api.reportExportUrl(scanId, format)}
-            className={`px-3 py-1.5 text-xs font-medium text-slate-300 transition hover:bg-white/10 hover:text-white ${
-              index > 0 ? "border-l border-white/10" : ""
+            className={`px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
+              index > 0 ? "border-l border-slate-200" : ""
             }`}
           >
             {label}

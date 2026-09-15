@@ -2,10 +2,10 @@ import { useReport } from "@/hooks/useScans";
 import type { CategoryScore } from "@/types/api";
 
 function scoreColor(score: number): string {
-  if (score >= 80) return "text-emerald-400";
-  if (score >= 60) return "text-amber-400";
-  if (score >= 40) return "text-orange-400";
-  return "text-rose-400";
+  if (score >= 80) return "text-emerald-600";
+  if (score >= 60) return "text-amber-600";
+  if (score >= 40) return "text-orange-600";
+  return "text-rose-600";
 }
 
 function barColor(score: number): string {
@@ -37,8 +37,8 @@ function ScoreGauge({ score, ready }: { score: number; ready: boolean }) {
       </svg>
       <div className="absolute flex flex-col items-center">
         <span className={`text-3xl font-bold ${scoreColor(score)}`}>{score}</span>
-        <span className="text-xs text-slate-400">/ 100</span>
-        <span className={`mt-1 text-xs font-medium ${ready ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className="text-xs text-slate-500">/ 100</span>
+        <span className={`mt-1 text-xs font-medium ${ready ? "text-emerald-600" : "text-rose-600"}`}>
           {ready ? "Ready" : "Not ready"}
         </span>
       </div>
@@ -50,13 +50,13 @@ function CategoryBar({ category }: { category: CategoryScore }) {
   return (
     <div className={category.applicable ? "" : "opacity-40"}>
       <div className="mb-1 flex items-center justify-between text-xs">
-        <span className="capitalize text-slate-300" title={category.explanation}>
+        <span className="capitalize text-slate-700" title={category.explanation}>
           {category.category}
           {!category.applicable ? " (n/a)" : ""}
         </span>
-        <span className="text-slate-400">{category.score}</span>
+        <span className="text-slate-500">{category.score}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
         <div
           className={`h-full rounded-full ${barColor(category.score)}`}
           style={{ width: `${category.score}%` }}
@@ -71,16 +71,16 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
 
   if (!scanId) {
     return (
-      <section className="flex min-h-[12rem] items-center justify-center rounded-xl border border-white/10 bg-surface-soft/60 p-5">
+      <section className="flex min-h-[12rem] items-center justify-center rounded-xl border border-slate-200 bg-surface-soft/60 p-5">
         <p className="text-sm text-slate-500">Select a scan to view production readiness.</p>
       </section>
     );
   }
 
   return (
-    <section className="rounded-xl border border-white/10 bg-surface-soft/60 p-5">
+    <section className="rounded-xl border border-slate-200 bg-surface-soft/60 p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Production Readiness
         </h2>
         {data ? (
@@ -91,9 +91,9 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-400">Computing readiness…</p>
+        <p className="text-sm text-slate-500">Computing readiness…</p>
       ) : isError ? (
-        <p className="text-sm text-rose-300">Could not load the report.</p>
+        <p className="text-sm text-rose-700">Could not load the report.</p>
       ) : data ? (
         <div className="space-y-6">
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
@@ -110,10 +110,10 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
 
           {data.production_readiness.blockers.length > 0 ? (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-300">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-rose-700">
                 Critical blockers
               </h3>
-              <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-300">
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
                 {data.production_readiness.blockers.map((b) => (
                   <li key={b}>{b}</li>
                 ))}
@@ -123,10 +123,10 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
 
           {data.production_readiness.top_risks.length > 0 ? (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-300">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
                 High priority
               </h3>
-              <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-300">
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-700">
                 {data.production_readiness.top_risks.map((r) => (
                   <li key={r}>{r}</li>
                 ))}
@@ -136,10 +136,10 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
 
           {data.production_readiness.next_actions.length > 0 ? (
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Recommended next actions
               </h3>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-400">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-500">
                 {data.production_readiness.next_actions.map((a) => (
                   <li key={a}>{a}</li>
                 ))}
@@ -147,7 +147,7 @@ export function ReadinessPanel({ scanId }: { scanId: string | null }) {
             </div>
           ) : null}
 
-          <p className="border-t border-white/10 pt-3 text-xs text-slate-500">
+          <p className="border-t border-slate-200 pt-3 text-xs text-slate-500">
             {data.production_readiness.explanation}
           </p>
         </div>

@@ -14,8 +14,8 @@ export default function NewScan() {
       <UploadPanel onUploaded={(scan) => navigate(`/scans/${scan.id}`)} />
 
       <Card className="mt-6 p-5">
-        <h2 className="text-sm font-semibold text-white">How it works</h2>
-        <ol className="mt-3 space-y-2 text-sm text-slate-400">
+        <h2 className="text-sm font-semibold text-slate-900">How it works</h2>
+        <ol className="mt-3 space-y-2 text-sm text-slate-500">
           {[
             "The archive is validated and safely extracted into an isolated workspace.",
             "Files are discovered and classified (Docker, Kubernetes, Terraform, CI/CD, …).",

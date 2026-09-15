@@ -173,7 +173,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     <section className="card p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="section-title">Upload repository</h2>
-        <div className="flex rounded-lg border border-white/10 p-0.5 text-xs">
+        <div className="flex rounded-lg border border-slate-200 p-0.5 text-xs">
           {(["zip", "folder"] as Mode[]).map((m) => (
             <button
               key={m}
@@ -183,7 +183,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 setLocalError(null);
               }}
               className={`rounded-md px-3 py-1 font-medium capitalize transition ${
-                mode === m ? "bg-brand-gradient text-white" : "text-slate-400 hover:text-slate-200"
+                mode === m ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-800"
               }`}
             >
               {m === "zip" ? "ZIP file" : "Folder"}
@@ -236,11 +236,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition ${
-          dragging ? "border-brand bg-brand/5" : "border-white/15 hover:border-brand/50 hover:bg-white/[0.03]"
+          dragging ? "border-brand bg-brand/5" : "border-slate-300 hover:border-brand/50 hover:bg-slate-50"
         } ${busy ? "pointer-events-none opacity-60" : ""}`}
       >
         <svg
-          className="mb-3 h-9 w-9 text-slate-400"
+          className="mb-3 h-9 w-9 text-slate-500"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -263,7 +263,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         </svg>
         {mode === "folder" ? (
           <>
-            <p className="text-sm font-medium text-slate-200">Click to choose a project folder</p>
+            <p className="text-sm font-medium text-slate-800">Click to choose a project folder</p>
             <p className="mt-1 text-xs text-slate-500">
               The folder is packaged in your browser; build/vendor dirs (node_modules, .git, …) are
               skipped.
@@ -271,7 +271,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </>
         ) : (
           <>
-            <p className="text-sm font-medium text-slate-200">
+            <p className="text-sm font-medium text-slate-800">
               Drag &amp; drop a repository ZIP, or click to browse
             </p>
             <p className="mt-1 text-xs text-slate-500">
@@ -283,11 +283,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
 
       {(busy || activeFraction > 0) && label ? (
         <div className="mt-4">
-          <div className="mb-1 flex items-center justify-between text-xs text-slate-400">
+          <div className="mb-1 flex items-center justify-between text-xs text-slate-500">
             <span className="truncate">{label}</span>
             <span>{Math.round(activeFraction * 100)}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full rounded-full bg-brand-gradient transition-all"
               style={{ width: `${Math.round(activeFraction * 100)}%` }}
@@ -298,7 +298,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       ) : null}
 
       {localError || serverError ? (
-        <p className="mt-4 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-inset ring-rose-500/30">
+        <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-inset ring-rose-600/20">
           {localError ?? serverError}
         </p>
       ) : null}

@@ -111,14 +111,14 @@ export default function Findings() {
         <EmptyState title="No findings match" description="Try relaxing the filters." />
       ) : (
         <Card>
-          <div className="flex items-center justify-between border-b border-white/10 px-5 py-2.5 text-xs text-slate-500">
+          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-2.5 text-xs text-slate-500">
             <span>
               Showing {filtered.length} of {items.length} findings
             </span>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/5 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2 font-medium">Severity</th>
                 <th className="px-5 py-2 font-medium">Finding</th>
                 <th className="px-5 py-2 font-medium">Scanner</th>
@@ -130,14 +130,14 @@ export default function Findings() {
               {filtered.map((f) => {
                 const meta = fileById.get(f.file_id ?? "");
                 return (
-                  <tr key={f.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                  <tr key={f.id} className="border-b border-slate-200 last:border-0 hover:bg-slate-50">
                     <td className="px-5 py-3">
                       <SeverityPill severity={f.severity} />
                     </td>
                     <td className="px-5 py-3">
                       <Link
                         to={`/scans/${id}/findings/${f.id}`}
-                        className="font-medium text-slate-100 hover:text-brand"
+                        className="font-medium text-slate-900 hover:text-brand"
                       >
                         {f.title}
                       </Link>
@@ -145,12 +145,12 @@ export default function Findings() {
                         {f.rule_id} · {prettyLabel(f.category)}
                       </p>
                     </td>
-                    <td className="px-5 py-3 text-slate-400">{f.scanner}</td>
-                    <td className="px-5 py-3 font-mono text-xs text-slate-400">
+                    <td className="px-5 py-3 text-slate-500">{f.scanner}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-500">
                       {meta?.path ?? "—"}
                       {f.line_number ? `:${f.line_number}` : ""}
                     </td>
-                    <td className="px-5 py-3 text-slate-400">{prettyLabel(f.confidence)}</td>
+                    <td className="px-5 py-3 text-slate-500">{prettyLabel(f.confidence)}</td>
                   </tr>
                 );
               })}

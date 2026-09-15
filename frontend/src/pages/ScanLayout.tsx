@@ -21,11 +21,11 @@ export default function ScanLayout() {
   return (
     <div>
       <div className="mb-5">
-        <NavLink to="/scans" className="text-xs text-slate-500 hover:text-slate-300">
+        <NavLink to="/scans" className="text-xs text-slate-500 hover:text-slate-700">
           ← All scans
         </NavLink>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-semibold tracking-tight text-white">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
             {scan?.repository_name ?? "Scan"}
           </h1>
           {scan ? <ScanStatusBadge status={scan.status} /> : null}
@@ -42,7 +42,7 @@ export default function ScanLayout() {
         </div>
       </div>
 
-      <div className="mb-6 flex gap-1 border-b border-white/10">
+      <div className="mb-6 flex gap-1 border-b border-slate-200">
         {TABS.map((tab) => (
           <NavLink
             key={tab.to || "overview"}
@@ -51,8 +51,8 @@ export default function ScanLayout() {
             className={({ isActive }) =>
               `-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${
                 isActive
-                  ? "border-brand text-white"
-                  : "border-transparent text-slate-400 hover:text-slate-200"
+                  ? "border-brand text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`
             }
           >

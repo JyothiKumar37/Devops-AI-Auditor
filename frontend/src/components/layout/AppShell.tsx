@@ -32,7 +32,7 @@ function HealthDot() {
     state === "up" ? "bg-emerald-500" : state === "down" ? "bg-rose-500" : "bg-amber-500";
   const label = state === "up" ? "API healthy" : state === "down" ? "API unreachable" : "Connecting";
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-400">
+    <div className="flex items-center gap-2 text-xs text-slate-500">
       <span className={`h-2 w-2 rounded-full ${color}`} aria-hidden />
       {label}
     </div>
@@ -42,14 +42,14 @@ function HealthDot() {
 function Brand() {
   return (
     <div className="flex items-center gap-3 px-2">
-      <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-gradient text-white shadow-[0_8px_24px_-8px_rgba(56,189,248,0.7)]">
+      <div className="grid h-9 w-9 place-items-center rounded-lg bg-slate-900 text-white">
         <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l7 4v5c0 4.4-3 7.4-7 9-4-1.6-7-4.6-7-9V7l7-4z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 12l1.8 1.8L15 10" />
         </svg>
       </div>
       <div className="leading-tight">
-        <p className="text-sm font-semibold text-white">DevOps Auditor</p>
+        <p className="text-sm font-semibold text-slate-900">DevOps Auditor</p>
         <p className="text-[11px] text-slate-500">Security &amp; readiness</p>
       </div>
     </div>
@@ -59,7 +59,7 @@ function Brand() {
 function NavList() {
   return (
     <nav className="flex flex-1 flex-col gap-1">
-      <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+      <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
         Workspace
       </p>
       {NAV.map((item) => (
@@ -68,21 +68,21 @@ function NavList() {
           to={item.to}
           end={item.end}
           className={({ isActive }) =>
-            `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+            `group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
               isActive
-                ? "bg-white/[0.06] text-white ring-1 ring-inset ring-white/10"
-                : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-200"
+                ? "bg-slate-100 text-slate-900"
+                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             }`
           }
         >
           {({ isActive }) => (
             <>
               <span
-                className={`absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-full bg-brand-gradient transition-all ${
+                className={`absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-full bg-accent transition-all ${
                   isActive ? "w-1 opacity-100" : "w-0 opacity-0"
                 }`}
               />
-              <span className={isActive ? "text-brand" : "text-slate-500 group-hover:text-slate-300"}>
+              <span className={isActive ? "text-accent" : "text-slate-400 group-hover:text-slate-600"}>
                 {item.icon}
               </span>
               {item.label}
@@ -97,26 +97,26 @@ function NavList() {
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-white/[0.06] bg-slate-950/50 px-4 py-6 backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-slate-200 bg-white px-4 py-6 lg:flex">
         <div className="mb-8">
           <Brand />
         </div>
         <NavList />
-        <div className="mt-auto space-y-3 border-t border-white/[0.06] pt-4">
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5">
+        <div className="mt-auto space-y-3 border-t border-slate-200 pt-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
             <HealthDot />
           </div>
-          <p className="px-1 text-[10px] text-slate-600">v0.1 · Enterprise edition</p>
+          <p className="px-1 text-[10px] text-slate-400">v0.1 · Enterprise edition</p>
         </div>
       </aside>
 
       <div className="flex min-h-full flex-1 flex-col lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/[0.06] bg-slate-950/40 px-4 backdrop-blur-xl sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 lg:hidden">
-            <span className="brand-text text-sm font-bold">DevOps Auditor</span>
+            <span className="text-sm font-bold text-slate-900">DevOps Auditor</span>
           </div>
           <div className="hidden items-center gap-2 text-xs text-slate-500 lg:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             Repository security &amp; production-readiness auditing
           </div>
           <div className="flex items-center gap-3">

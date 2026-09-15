@@ -24,8 +24,8 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h1 className="text-xl font-semibold tracking-tight text-white">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-slate-400">{subtitle}</p> : null}
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
+        {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
     </div>
@@ -57,8 +57,8 @@ export function Badge({ children, className = "" }: { children: ReactNode; class
 
 export function Spinner({ label }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2 text-sm text-slate-400" role="status">
-      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-brand" />
+    <div className="flex items-center gap-2 text-sm text-slate-500" role="status">
+      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-accent" />
       {label ?? "Loading…"}
     </div>
   );
@@ -74,8 +74,8 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-900/30 px-6 py-14 text-center">
-      <p className="text-sm font-medium text-slate-200">{title}</p>
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center">
+      <p className="text-sm font-medium text-slate-800">{title}</p>
       {description ? <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
@@ -116,7 +116,7 @@ export function ScoreRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="rgba(148,163,184,0.15)"
+          stroke="rgba(148,163,184,0.25)"
           strokeWidth={stroke}
         />
         <circle
@@ -133,7 +133,7 @@ export function ScoreRing({
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-3xl font-extrabold text-white">{clamped}</span>
+        <span className="text-3xl font-extrabold text-slate-900">{clamped}</span>
         <span className="text-[10px] uppercase tracking-widest text-slate-500">
           {caption ?? "/ 100"}
         </span>
@@ -146,7 +146,7 @@ export function StatCard({
   label,
   value,
   hint,
-  accent = "text-white",
+  accent = "text-slate-900",
   icon,
 }: {
   label: string;
@@ -159,7 +159,7 @@ export function StatCard({
     <div className="card card-hover animate-in p-5">
       <div className="flex items-start justify-between">
         <p className="section-title">{label}</p>
-        {icon ? <span className="text-slate-500">{icon}</span> : null}
+        {icon ? <span className="text-slate-400">{icon}</span> : null}
       </div>
       <p className={`mt-3 text-3xl font-bold tracking-tight ${accent}`}>{value}</p>
       {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
@@ -179,7 +179,7 @@ export function Meter({
   const clamped = Math.max(0, Math.min(100, value));
   return (
     <span
-      className="block w-full overflow-hidden rounded-full bg-white/10"
+      className="block w-full overflow-hidden rounded-full bg-slate-100"
       style={{ height }}
     >
       <span
@@ -206,8 +206,8 @@ export function SectionHeading({
   return (
     <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="text-lg font-semibold tracking-tight text-white">{title}</h2>
-        {subtitle ? <p className="mt-0.5 text-sm text-slate-400">{subtitle}</p> : null}
+        <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+        {subtitle ? <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
     </div>

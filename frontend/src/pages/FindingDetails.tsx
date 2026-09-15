@@ -17,15 +17,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
-      <div className="text-sm leading-relaxed text-slate-300">{children}</div>
+      <div className="text-sm leading-relaxed text-slate-700">{children}</div>
     </div>
   );
 }
 
 const PRIMARY_BTN =
-  "inline-flex items-center gap-2 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50";
 const APPROVE_BTN =
-  "inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50";
 
 export default function FindingDetails() {
   const { scanId, findingId } = useParams();
@@ -57,17 +57,17 @@ export default function FindingDetails() {
   if (applied?.resolved) {
     return (
       <div>
-        <Link to={`/scans/${id}/findings`} className="text-xs text-slate-500 hover:text-slate-300">
+        <Link to={`/scans/${id}/findings`} className="text-xs text-slate-500 hover:text-slate-700">
           ← All findings
         </Link>
         <Card className="mt-3 p-6">
           <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
               ✓
             </span>
             <div>
-              <h1 className="text-lg font-semibold text-white">Finding resolved</h1>
-              <p className="text-sm text-slate-400">{applied.message}</p>
+              <h1 className="text-lg font-semibold text-slate-900">Finding resolved</h1>
+              <p className="text-sm text-slate-500">{applied.message}</p>
             </div>
           </div>
           <p className="mb-4 text-xs text-slate-500">
@@ -83,7 +83,7 @@ export default function FindingDetails() {
   if (isLoading) return <Spinner />;
   if (!finding) {
     return (
-      <Card className="p-8 text-center text-sm text-slate-400">
+      <Card className="p-8 text-center text-sm text-slate-500">
         Finding not found.{" "}
         <Link to={`/scans/${id}/findings`} className="text-brand hover:underline">
           Back to findings
@@ -97,7 +97,7 @@ export default function FindingDetails() {
 
   return (
     <div>
-      <Link to={`/scans/${id}/findings`} className="text-xs text-slate-500 hover:text-slate-300">
+      <Link to={`/scans/${id}/findings`} className="text-xs text-slate-500 hover:text-slate-700">
         ← All findings
       </Link>
 
@@ -106,10 +106,10 @@ export default function FindingDetails() {
           <div className="p-5">
             <div className="mb-2 flex flex-wrap items-center gap-2">
               <SeverityPill severity={finding.severity} />
-              <Badge className="bg-white/5 text-slate-300 ring-white/10">{finding.scanner}</Badge>
-              <Badge className="bg-white/5 text-slate-400 ring-white/10">{finding.rule_id}</Badge>
+              <Badge className="bg-slate-50 text-slate-700 ring-slate-200">{finding.scanner}</Badge>
+              <Badge className="bg-slate-50 text-slate-500 ring-slate-200">{finding.rule_id}</Badge>
             </div>
-            <h1 className="text-lg font-semibold text-white">{finding.title}</h1>
+            <h1 className="text-lg font-semibold text-slate-900">{finding.title}</h1>
             <p className="mt-1 font-mono text-xs text-slate-500">
               {file?.path ?? "—"}
               {finding.line_number ? `:${finding.line_number}` : ""}
@@ -120,7 +120,7 @@ export default function FindingDetails() {
             <Section title="Why it matters">{finding.description || finding.title}</Section>
             {finding.evidence ? (
               <Section title="Evidence">
-                <pre className="overflow-x-auto rounded-lg border border-white/10 bg-slate-950/70 p-3 font-mono text-xs text-amber-200">
+                <pre className="overflow-x-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-800">
                   {finding.evidence}
                 </pre>
               </Section>
@@ -135,10 +135,10 @@ export default function FindingDetails() {
         </Card>
 
         <Card className="flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-            <span className="font-mono text-xs text-slate-400">{file?.path ?? "source"}</span>
+          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+            <span className="font-mono text-xs text-slate-500">{file?.path ?? "source"}</span>
             {finding.line_number ? (
-              <span className="text-xs text-amber-300">line {finding.line_number}</span>
+              <span className="text-xs text-amber-700">line {finding.line_number}</span>
             ) : null}
           </div>
           <div className="h-[28rem]">
@@ -157,7 +157,7 @@ export default function FindingDetails() {
       <Card className="mt-6 p-5">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-white">Suggested remediation</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Suggested remediation</h2>
             <p className="text-xs text-slate-500">
               Fixes are deterministic and applied only to the stored analysis copy after your
               explicit approval. Your repository is never modified.
@@ -176,14 +176,14 @@ export default function FindingDetails() {
         </div>
 
         {generate.isError ? (
-          <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-inset ring-rose-500/30">
+          <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-inset ring-rose-600/20">
             {(generate.error as Error).message}
           </p>
         ) : null}
 
         {proposal?.status === "manual_required" ? (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-            <p className="text-sm font-medium text-amber-200">Manual remediation required.</p>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-amber-700">Manual remediation required.</p>
             <p className="mt-1 text-sm text-amber-100/80">
               No safe automatic fix can be generated for this finding without guessing a value.
             </p>
@@ -196,7 +196,7 @@ export default function FindingDetails() {
         {canApprove && proposal ? (
           <div className="space-y-4">
             <div>
-              <p className="text-sm font-medium text-slate-200">{proposal.summary}</p>
+              <p className="text-sm font-medium text-slate-800">{proposal.summary}</p>
               {proposal.rationale ? (
                 <p className="mt-0.5 text-xs text-slate-500">{proposal.rationale}</p>
               ) : null}
@@ -207,12 +207,12 @@ export default function FindingDetails() {
             ) : null}
 
             {apply.data && !apply.data.resolved ? (
-              <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/30">
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700 ring-1 ring-inset ring-amber-600/20">
                 {apply.data.message}
               </p>
             ) : null}
             {apply.isError ? (
-              <p className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300 ring-1 ring-inset ring-rose-500/30">
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 ring-1 ring-inset ring-rose-600/20">
                 {(apply.error as Error).message}
               </p>
             ) : null}

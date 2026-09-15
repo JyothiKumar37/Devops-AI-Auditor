@@ -16,7 +16,7 @@ export default function ScanHistory() {
         actions={
           <Link
             to="/scan/new"
-            className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-brand-muted"
+            className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
           >
             New Scan
           </Link>
@@ -32,7 +32,7 @@ export default function ScanHistory() {
         <Card>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/5 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2.5 font-medium">Repository</th>
                 <th className="px-5 py-2.5 font-medium">Source</th>
                 <th className="px-5 py-2.5 font-medium">Status</th>
@@ -42,24 +42,24 @@ export default function ScanHistory() {
             </thead>
             <tbody>
               {data.items.map((scan) => (
-                <tr key={scan.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                <tr key={scan.id} className="border-b border-slate-200 last:border-0 hover:bg-slate-50">
                   <td className="px-5 py-3">
                     <Link
                       to={`/scans/${scan.id}`}
-                      className="font-medium text-slate-100 hover:text-brand"
+                      className="font-medium text-slate-900 hover:text-brand"
                     >
                       {scan.repository_name}
                     </Link>
                     {scan.error_message ? (
-                      <p className="text-xs text-rose-400">{scan.error_message}</p>
+                      <p className="text-xs text-rose-600">{scan.error_message}</p>
                     ) : null}
                   </td>
-                  <td className="px-5 py-3 text-slate-400">{prettyLabel(scan.source_type)}</td>
+                  <td className="px-5 py-3 text-slate-500">{prettyLabel(scan.source_type)}</td>
                   <td className="px-5 py-3">
                     <ScanStatusBadge status={scan.status} />
                   </td>
-                  <td className="px-5 py-3 text-slate-400">{scan.file_count}</td>
-                  <td className="px-5 py-3 text-slate-400">{formatDateTime(scan.created_at)}</td>
+                  <td className="px-5 py-3 text-slate-500">{scan.file_count}</td>
+                  <td className="px-5 py-3 text-slate-500">{formatDateTime(scan.created_at)}</td>
                 </tr>
               ))}
             </tbody>
