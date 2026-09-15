@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -16,20 +16,13 @@ body,
 
 body {
   margin: 0;
-  color: #0f172a;
+  color: #111827;
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background-color: #f7f8fc;
-  background-image:
-    radial-gradient(44rem 32rem at 100% -8%, rgba(124, 58, 237, 0.08), transparent 60%),
-    radial-gradient(40rem 30rem at -8% 6%, rgba(79, 70, 229, 0.08), transparent 55%),
-    radial-gradient(36rem 30rem at 50% 120%, rgba(14, 165, 233, 0.05), transparent 60%);
-  background-attachment: fixed;
+  background-color: #f7f8fa;
 }
 
-/* Refined scrollbars for the enterprise feel. */
 ::-webkit-scrollbar {
   width: 12px;
   height: 12px;
@@ -38,73 +31,70 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.35);
+  background: rgba(100, 116, 139, 0.32);
   border-radius: 9999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.55);
+  background: rgba(100, 116, 139, 0.5);
   background-clip: content-box;
 }
 
 *:focus-visible {
   outline: 2px solid #2563eb;
-  outline-offset: 2px;
-  border-radius: 6px;
+  outline-offset: 1px;
+  border-radius: 4px;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+    @apply rounded-md border border-slate-200 bg-white shadow-card;
   }
   .card-hover {
-    @apply transition duration-150 hover:border-slate-300 hover:shadow-card-hover;
+    @apply transition-colors duration-150 hover:border-slate-300;
   }
   .panel {
-    @apply rounded-lg border border-slate-200 bg-slate-50;
+    @apply rounded-md border border-slate-200 bg-slate-50;
   }
   .input {
-    @apply rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
-      placeholder:text-slate-400 focus:border-accent focus:outline-none
-      focus:ring-4 focus:ring-accent/10;
+    @apply rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900
+      placeholder:text-slate-400 focus:border-brand focus:outline-none
+      focus:ring-2 focus:ring-brand/20;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold
-      transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium
+      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-brand-gradient text-white shadow-brand transition
-      hover:shadow-brand-lg hover:brightness-[1.06];
+    @apply btn bg-slate-900 text-white hover:bg-slate-800;
   }
   .btn-dark {
-    @apply btn bg-slate-900 text-white shadow-sm hover:bg-slate-800;
+    @apply btn bg-slate-900 text-white hover:bg-slate-800;
   }
   .btn-ghost {
-    @apply btn border border-slate-300 bg-white text-slate-700 hover:border-slate-400
-      hover:bg-slate-50 hover:text-slate-900;
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
   }
   .btn-subtle {
     @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900;
   }
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium
+    @apply inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium
       ring-1 ring-inset;
   }
   .text-gradient {
-    @apply bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 bg-clip-text
-      text-transparent;
+    @apply text-slate-900;
   }
   .brand-text {
-    @apply bg-brand-gradient bg-clip-text text-transparent;
+    @apply text-slate-900;
   }
   .section-title {
-    @apply text-xs font-semibold uppercase tracking-[0.12em] text-slate-500;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500;
   }
 }
 
 @layer utilities {
   .animate-in {
-    animation: fade-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: fade-rise 0.28s ease-out both;
   }
 }

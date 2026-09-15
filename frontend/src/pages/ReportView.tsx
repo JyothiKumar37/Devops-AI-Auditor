@@ -224,14 +224,9 @@ export default function ReportView() {
       </div>
 
       {/* Hero: score + executive summary */}
-      <Card className="animate-in relative overflow-hidden">
-        <span className="absolute inset-x-0 top-0 h-1 bg-brand-gradient" aria-hidden />
+      <Card className="animate-in overflow-hidden">
         <div className="grid gap-6 p-6 md:grid-cols-[auto_1fr]">
-          <div
-            className={`flex flex-col items-center justify-center gap-3 rounded-xl bg-gradient-to-b to-white p-4 md:pr-6 ${
-              pr.ready ? "from-emerald-50" : "from-rose-50"
-            }`}
-          >
+          <div className="flex flex-col items-center justify-center gap-3 md:border-r md:border-slate-200 md:pr-6">
             <ScoreRing score={pr.score} />
             <span
               className={`chip ${

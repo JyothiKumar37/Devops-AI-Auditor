@@ -289,7 +289,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-slate-100">
             <div
-              className="h-full rounded-full bg-brand-gradient transition-all"
+              className="h-full rounded-full bg-brand transition-all"
               style={{ width: `${Math.round(activeFraction * 100)}%` }}
             />
           </div>
