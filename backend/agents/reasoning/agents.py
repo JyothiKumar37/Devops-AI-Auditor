@@ -45,9 +45,11 @@ _SECURITY_CATEGORIES = {"security", "secrets", "supply_chain"}
 _CONFIDENCE_RANK = {"low": 0, "medium": 1, "high": 2}
 
 _NON_PROD_PATH_MARKERS = (
-    "test", "tests", "example", "examples", "fixture", "fixtures", "sample",
-    "samples", "mock", "__mocks__", "docs", "vendor", "node_modules", ".terraform",
+    "test", "tests", "__tests__", "spec", "specs", "e2e", "example", "examples",
+    "fixture", "fixtures", "sample", "samples", "mock", "mocks", "__mocks__",
+    "docs", "vendor", "node_modules", ".terraform",
 )
+_TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist")
 
 _TECH_BY_FILETYPE = {
     "dockerfile": "Docker", "docker_compose": "Docker Compose", "kubernetes": "Kubernetes",
@@ -330,7 +332,9 @@ def false_positive_review(state: ReasoningState, provider: LLMProvider) -> dict[
     for f in state.get("findings", []):
         path = (f.get("file") or "").lower()
         parts = set(path.replace("\\", "/").split("/"))
-        in_non_prod = bool(parts & set(_NON_PROD_PATH_MARKERS))
+        name = path.rsplit("/", 1)[-1]
+        is_template = name.endswith(_TEMPLATE_SUFFIXES)
+        in_non_prod = bool(parts & set(_NON_PROD_PATH_MARKERS)) or is_template
         low_impact = f["severity"] in {"info", "low"}
         if in_non_prod and low_impact:
             assessments.append(

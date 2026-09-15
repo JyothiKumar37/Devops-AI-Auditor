@@ -72,6 +72,9 @@ def _styles() -> dict[str, ParagraphStyle]:
         "rec": ParagraphStyle(
             "rRec", parent=body, fontSize=9, textColor=colors.HexColor("#334155")
         ),
+        # Enough leading for the large score glyph so it never overlaps
+        # neighbouring lines.
+        "scoreline": ParagraphStyle("rScoreLine", parent=body, fontSize=12, leading=32),
     }
     return styles
 
@@ -276,12 +279,14 @@ def render_pdf(model: ReportModel) -> bytes:
     ready_txt = "Production Ready" if pr.ready else "Not Production Ready"
     story.append(
         Paragraph(
-            f'<font color="{score_hex}" size="30"><b>{pr.score}</b></font>'
-            f'<font color="#64748b" size="11"> / 100 · {_e(pr.rating)} · {_e(ready_txt)}</font>',
-            st["body"],
+            f'<font color="{score_hex}" size="26"><b>{pr.score}</b></font>'
+            f'<font color="#64748b" size="12"> / 100 &nbsp;·&nbsp; {_e(pr.rating)} '
+            f"&nbsp;·&nbsp; {_e(ready_txt)}</font>",
+            st["scoreline"],
         )
     )
     if pr.summary:
+        story.append(Spacer(1, 2))
         story.append(Paragraph(_e(pr.summary), st["small"]))
     applicable = [cs for cs in pr.category_scores if cs.applicable]
     if applicable:

@@ -55,3 +55,17 @@ def test_high_entropy_token() -> None:
 def test_hex_checksums_are_not_high_entropy_secrets() -> None:
     sha = "a" * 40  # a git SHA / checksum shape
     assert "SEC011" not in _ids(f'rev = "{sha}"')
+
+
+def test_high_entropy_ignores_paths_and_identifiers() -> None:
+    # URL/route strings and SQL/code identifiers must not be treated as secrets.
+    for benign in (
+        'url = "/api/v1/manufacturing/work-orders"',
+        'route = "supply-chain/procurement/requisitions"',
+        'name = "hrm_employee_department_id_idx"',
+        'fk = "inventory_movements_product_id_fkey"',
+        'icon = "formatDoubleChevronRight"',
+    ):
+        assert "SEC011" not in _ids(benign), benign
+    # A genuinely random token is still detected.
+    assert "SEC011" in _ids('session = "b3J8Kd9Xq2Lm5Pn7Rt1Vw4Zy6Ac0Eg8Ij"')

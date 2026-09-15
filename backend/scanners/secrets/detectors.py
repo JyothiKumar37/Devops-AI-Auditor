@@ -93,6 +93,29 @@ _GENERIC_RE = re.compile(
 _QUOTED_TOKEN_RE = re.compile(r"[\"']([A-Za-z0-9+/=_\-]{20,})[\"']")
 _HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 
+# Structural shapes that are almost never secrets but often trip an entropy
+# threshold: URL/route paths, SQL/code identifiers and dotted/camelCase symbols.
+# Excluding them removes the dominant class of high-entropy false positives
+# (e.g. "/api/v1/manufacturing/work-orders", "hrm_employee_id_idx",
+# "formatDouble") without discarding genuinely random tokens (which mix case
+# and digits with no path/identifier structure).
+_PATH_LIKE_RE = re.compile(r"^/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
+_REL_PATH_RE = re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)+$")
+_SNAKE_IDENT_RE = re.compile(r"^[A-Za-z]+(?:_[A-Za-z0-9]+)+$")
+_DOTTED_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+$")
+_CAMEL_WORDS_RE = re.compile(r"^[a-z]+(?:[A-Z][a-z]+)+$")
+
+
+def _looks_like_code_or_path(token: str) -> bool:
+    """True if the token is a URL path, SQL/code identifier or dotted symbol."""
+    if "/" in token and (_PATH_LIKE_RE.match(token) or _REL_PATH_RE.match(token)):
+        return True
+    return bool(
+        _SNAKE_IDENT_RE.match(token)
+        or _DOTTED_RE.match(token)
+        or _CAMEL_WORDS_RE.match(token)
+    )
+
 _PLACEHOLDER_SUBSTRINGS = (
     "example", "placeholder", "changeme", "change_me", "your_", "yourpassword",
     "dummy", "sample", "redacted", "xxxx", "todo", "notreal", "fake",
@@ -127,6 +150,9 @@ def find_high_entropy_tokens(line: str) -> list[str]:
             continue
         # Skip pure-hex checksums/hashes (git SHAs, sha256) - common false positives.
         if _HEX_RE.match(token) and len(token) in (32, 40, 64):
+            continue
+        # Skip URL paths and code/SQL identifiers - structurally not secrets.
+        if _looks_like_code_or_path(token):
             continue
         if shannon_entropy(token) >= _ENTROPY_THRESHOLD:
             tokens.append(token)

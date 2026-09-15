@@ -69,6 +69,23 @@ def test_lockfiles_skip_entropy_detector() -> None:
     assert SecretScanner().scan_text("package-lock.json", line) == []
 
 
+def test_template_and_test_files_downrank_secrets() -> None:
+    db_url = 'DATABASE_URL="postgres://user:S3cretP0rtalValue99@db:5432/app"'
+    # In a real file the DB password is HIGH severity.
+    prod = SecretScanner().scan_text("backend/.env", db_url)
+    assert any(f.rule_id == "SEC009" and f.severity == Severity.HIGH for f in prod)
+
+    # In a template (.env.example) the same finding is down-ranked to LOW.
+    template = SecretScanner().scan_text("backend/.env.example", db_url)
+    assert template and all(f.severity == Severity.LOW for f in template)
+
+    # Credentials in test paths are down-ranked too.
+    test = SecretScanner().scan_text(
+        "src/test/java/AuthTest.java", 'password = "S3cretP0rtalValue99"'
+    )
+    assert test and all(f.severity == Severity.LOW for f in test)
+
+
 def test_clean_file_has_no_findings() -> None:
     text = "name = \"my-app\"\nversion = \"1.2.3\"\ndebug = false\n"
     assert SecretScanner().scan_text("config.toml", text) == []
