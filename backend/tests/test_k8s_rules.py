@@ -59,6 +59,35 @@ def test_env_credential_is_redacted() -> None:
     assert "literalsecret" not in (finding.evidence or "")
 
 
+SAFE_ENV_POD = """\
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cfg
+spec:
+  containers:
+    - name: c
+      image: app:1.2.3
+      env:
+        - name: SESSION_TOKEN_TTL
+          value: "3600"
+        - name: API_TOKEN_TIMEOUT
+          value: "30s"
+        - name: AUTH_TOKEN_MODE
+          value: STRICT_MODE
+        - name: REAL_API_TOKEN
+          value: s3cr3tL00kingValue
+"""
+
+
+def test_env_config_values_are_not_flagged_as_credentials() -> None:
+    # Duration/TTL/number/symbolic env values must not be treated as credentials;
+    # only the genuine literal secret should raise K8S061.
+    creds = [f for f in _findings(SAFE_ENV_POD) if f.rule_id == "K8S061"]
+    assert len(creds) == 1
+    assert "REAL_API_TOKEN" in creds[0].description
+
+
 def test_missing_probes_and_resources() -> None:
     text = (
         "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: d\n"

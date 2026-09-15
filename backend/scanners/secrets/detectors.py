@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 
 from models.enums import Confidence, Severity
+from scanners.credential_values import is_duration_or_config_key, is_non_secret_value
 from scanners.secrets.masking import shannon_entropy
 
 
@@ -132,12 +133,21 @@ def is_placeholder(value: str) -> bool:
 
 
 def find_generic_credentials(line: str) -> list[tuple[str, str]]:
-    """Return (key, value) for literal credential assignments (placeholders skipped)."""
+    """Return (key, value) for literal credential assignments.
+
+    Placeholders and non-secret config values (durations, numbers, booleans and
+    SCREAMING_SNAKE constants) are skipped, as are keys that denote a TTL or
+    timeout rather than a credential (e.g. ``ACCESS_TOKEN_TTL``).
+    """
     results: list[tuple[str, str]] = []
     for match in _GENERIC_RE.finditer(line):
+        key = match.group(1)
         value = match.group(2)
-        if not is_placeholder(value):
-            results.append((match.group(1), value))
+        if is_placeholder(value):
+            continue
+        if is_non_secret_value(value) or is_duration_or_config_key(key):
+            continue
+        results.append((key, value))
     return results
 
 

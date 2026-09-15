@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from models.enums import Confidence, FindingCategory, Severity
+from scanners.credential_values import is_duration_or_config_key, is_non_secret_value
 from scanners.finding import RuleFinding
 from scanners.kubernetes.model import K8sResource
 from scanners.yaml_lines import line_of
@@ -403,7 +404,13 @@ def _check_env_credentials(resource: K8sResource, emit: Emitter) -> None:
                 emit.add("K8S061", resource, description=f"Env '{key}' contains an AWS key.",
                          line=line_of(entry, "name"), evidence=f"{key}=<redacted>",
                          severity=Severity.CRITICAL)
-            elif _SECRET_KEY_RE.search(key) and value and not value.startswith("$"):
+            elif (
+                _SECRET_KEY_RE.search(key)
+                and value
+                and not value.startswith("$")
+                and not is_non_secret_value(value)
+                and not is_duration_or_config_key(key)
+            ):
                 emit.add("K8S061", resource,
                          description=f"Env '{key}' has a hardcoded credential value.",
                          line=line_of(entry, "name"), evidence=f"{key}=<redacted>")

@@ -3,7 +3,10 @@
 The score is computed purely from the deterministic findings - never asked of an
 LLM. Each finding is assigned to one of eight readiness categories and penalises
 that category by a weight that scales with severity (critical penalties are far
-larger than informational ones) and the finding's confidence. Category scores are
+larger than informational ones) and the finding's confidence. Within a category
+repeated findings of the same severity apply diminishing penalties (a bounded
+geometric series), so a large volume of lower-severity issues cannot floor a
+category to zero unless genuine critical issues are present. Category scores are
 combined into an overall score using category importance weights, restricted to
 the categories that actually apply to the repository.
 """
@@ -16,9 +19,17 @@ from typing import Any
 from agents.reasoning.schemas import CategoryScore, ProductionReadiness
 from models.enums import Confidence, Severity
 
-# Penalty per finding by severity - critical dominates.
+# Penalty for the first finding of a severity - critical dominates.
 _SEVERITY_PENALTY = {
     "critical": 45.0, "high": 22.0, "medium": 9.0, "low": 3.0, "info": 1.0,
+}
+# Diminishing-returns decay applied to each additional finding of the same
+# severity within a category. The per-severity penalty is a geometric series
+# (base + base*decay + base*decay^2 + ...) so it converges to a finite cap:
+# many medium/low findings can no longer floor a category to 0 when there are
+# no criticals. Criticals do not decay - each one is a genuine blocker.
+_SEVERITY_DECAY = {
+    "critical": 1.0, "high": 0.6, "medium": 0.55, "low": 0.5, "info": 0.4,
 }
 # Lower-confidence findings penalise less.
 _CONFIDENCE_FACTOR = {"high": 1.0, "medium": 0.75, "low": 0.5}
@@ -113,13 +124,9 @@ def assess(findings: list[dict[str, Any]], files: list[dict[str, Any]]) -> Produ
     for category in _CATEGORY_ORDER:
         members = by_category.get(category, [])
         counts: dict[str, int] = defaultdict(int)
-        penalty = 0.0
         for f in members:
-            sev = f["severity"]
-            counts[sev] += 1
-            penalty += _SEVERITY_PENALTY.get(sev, 1.0) * _CONFIDENCE_FACTOR.get(
-                f.get("confidence", "medium"), 0.75
-            )
+            counts[f["severity"]] += 1
+        penalty = _category_penalty(members)
         score = max(0, min(100, round(100 - penalty)))
         is_applicable = category in applicable
         explanation = _category_explanation(category, members, counts, penalty, score)
@@ -159,7 +166,9 @@ def assess(findings: list[dict[str, Any]], files: list[dict[str, Any]]) -> Produ
         "Overall score is the weighted average of the applicable category scores "
         f"({', '.join(sorted(applicable))}). Each category starts at 100 and loses "
         "severity-weighted, confidence-adjusted points per finding (critical=45, "
-        "high=22, medium=9, low=3, info=1)."
+        "high=22, medium=9, low=3, info=1). Repeated findings of the same severity "
+        "apply diminishing penalties, so a large volume of lower-severity issues "
+        "cannot drive a category to zero unless critical issues are present."
     )
 
     return ProductionReadiness(
@@ -173,6 +182,29 @@ def assess(findings: list[dict[str, Any]], files: list[dict[str, Any]]) -> Produ
         next_actions=next_actions,
         explanation=explanation,
     )
+
+
+def _category_penalty(members: list[dict[str, Any]]) -> float:
+    """Confidence-weighted penalty with per-severity diminishing returns.
+
+    Within each severity the highest-confidence findings penalise at the full
+    rate and each subsequent finding decays geometrically, so the total penalty
+    a severity can contribute to a category is bounded. Criticals do not decay -
+    each one is treated as a genuine production blocker.
+    """
+    by_severity: dict[str, list[float]] = defaultdict(list)
+    for f in members:
+        confidence = _CONFIDENCE_FACTOR.get(f.get("confidence", "medium"), 0.75)
+        by_severity[f["severity"]].append(confidence)
+
+    total = 0.0
+    for sev, factors in by_severity.items():
+        base = _SEVERITY_PENALTY.get(sev, 1.0)
+        decay = _SEVERITY_DECAY.get(sev, 0.5)
+        factors.sort(reverse=True)  # the full-rate hit goes to the strongest evidence
+        for rank, confidence in enumerate(factors):
+            total += base * confidence * (decay**rank)
+    return total
 
 
 def _category_explanation(

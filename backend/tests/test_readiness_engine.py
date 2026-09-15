@@ -81,6 +81,25 @@ def test_every_category_has_an_explanation() -> None:
     assert result.explanation  # overall explanation present
 
 
+def test_many_lower_severity_findings_do_not_floor_a_category() -> None:
+    files = [{"file_type": "dockerfile"}]
+    # 30 medium security findings would floor the category under a linear model
+    # (30 x 9 = 270 points). Diminishing returns keep the category off zero.
+    many_medium = assess(
+        [_f(str(i), severity="medium", category="security", scanner="secret-scanner")
+         for i in range(30)],
+        files,
+    )
+    security = next(c for c in many_medium.category_scores if c.category == "security")
+    assert security.score >= 70
+
+    # A single critical must still dominate a large pile of mediums.
+    one_critical = assess(
+        [_f("c", severity="critical", category="security", scanner="secret-scanner")], files
+    )
+    assert one_critical.score < many_medium.score
+
+
 def test_confidence_reduces_penalty() -> None:
     files = [{"file_type": "dockerfile"}]
     high_conf = assess([_f("1", severity="high", category="security", confidence="high")], files)

@@ -40,6 +40,16 @@ def test_generic_credential() -> None:
     assert "SEC010" in _ids('password = "realL00kingSecretValue"')
 
 
+def test_config_values_are_not_flagged_as_credentials() -> None:
+    # Durations, plain numbers and symbolic SCREAMING_SNAKE constants paired with
+    # a credential-like key are configuration, not secrets.
+    assert "SEC010" not in _ids('api_key = "3600000"')  # pure number
+    assert "SEC010" not in _ids('secret = "3600ms"')  # duration literal
+    assert "SEC010" not in _ids('auth_token = "AUTH_INVALID_TOKEN"')  # symbolic constant
+    # A genuine literal credential is still detected.
+    assert "SEC010" in _ids('api_key = "realL00kingSecretValue"')
+
+
 def test_placeholders_are_ignored() -> None:
     assert _ids('password = "changeme"') == set()
     assert _ids('password = "your_password_here"') == set()

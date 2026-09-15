@@ -8,13 +8,13 @@ only; repository code is never executed.
 
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path, PurePosixPath
 
 from core.config import Settings
 from core.logging import get_logger
-from models.enums import Confidence, FindingCategory, Severity
+from models.enums import FindingCategory, Severity
 from scanners.finding import RuleFinding
+from scanners.low_signal import downrank, is_low_signal_path
 from scanners.secrets import gitleaks
 from scanners.secrets.detectors import (
     DETECTORS,
@@ -33,34 +33,6 @@ _LOCKFILE_NAMES = {
     "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "go.sum", "cargo.lock",
     "composer.lock", "gemfile.lock", "poetry.lock", "pipfile.lock",
 }
-
-# Files whose secrets are low-signal: template/sample env files hold placeholder
-# credentials by convention, and test fixtures are not production secrets. Their
-# findings are down-ranked to LOW so they do not appear as HIGH/MEDIUM blockers.
-_TEMPLATE_SUFFIXES = (".example", ".sample", ".template", ".dist")
-_NON_PROD_SEGMENTS = {
-    "test", "tests", "__tests__", "__mocks__", "spec", "specs", "e2e",
-    "fixture", "fixtures", "mock", "mocks", "example", "examples",
-    "sample", "samples", "docs",
-}
-
-
-def _is_low_signal_path(file_path: str) -> bool:
-    """True for template/sample env files and test/fixture/docs paths."""
-    path = PurePosixPath(file_path)
-    name = path.name.lower()
-    if name.endswith(_TEMPLATE_SUFFIXES):
-        return True
-    if any(marker in name for marker in (".example.", ".sample.", ".template.")):
-        return True
-    return bool({segment.lower() for segment in path.parts} & _NON_PROD_SEGMENTS)
-
-
-def _downrank(finding: RuleFinding) -> RuleFinding:
-    """Cap a finding to LOW severity/confidence (for low-signal files)."""
-    if finding.severity == Severity.LOW and finding.confidence == Confidence.LOW:
-        return finding
-    return replace(finding, severity=Severity.LOW, confidence=Confidence.LOW)
 
 
 class SecretScanner:
@@ -118,8 +90,8 @@ class SecretScanner:
                     )
 
         findings = _dedupe(candidates)
-        if _is_low_signal_path(file_path):
-            findings = [_downrank(f) for f in findings]
+        if is_low_signal_path(file_path):
+            findings = [downrank(f) for f in findings]
         return findings
 
     # -- repository scanning -------------------------------------------------

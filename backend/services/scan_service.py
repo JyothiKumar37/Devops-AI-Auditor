@@ -34,6 +34,7 @@ from scanners.correlation import CorrelationExtractor
 from scanners.docker import DockerScanner
 from scanners.finding import RuleFinding
 from scanners.kubernetes import KubernetesScanner
+from scanners.low_signal import downrank_if_low_signal
 from scanners.secrets import SecretScanner
 from scanners.terraform import TerraformScanner
 from services.ingestion.archive import ArchiveValidationError, ZipArchiveExtractor
@@ -367,6 +368,10 @@ class ScanService:
         file_id: uuid.UUID | None,
         rule_finding: RuleFinding,
     ) -> Finding:
+        # Findings from template/sample env files and test/example/docs paths are
+        # capped to LOW across every scanner so they never surface as HIGH/MEDIUM
+        # production blockers (the false-positive review then sweeps them).
+        rule_finding = downrank_if_low_signal(rule_finding)
         return Finding(
             id=uuid.uuid4(),
             scan_id=scan_id,
