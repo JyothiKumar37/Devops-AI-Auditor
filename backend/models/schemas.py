@@ -71,6 +71,7 @@ class ScanSummary(BaseModel):
     completed_at: datetime | None = None
     error_message: str | None = None
     file_count: int = 0
+    readiness: int | None = None
 
 
 class RepositoryFileRead(BaseModel):
@@ -164,14 +165,26 @@ class RepositoryFileContent(BaseModel):
     content: str | None = None
 
 
+class TopRule(BaseModel):
+    """A frequently-occurring rule across all scans."""
+
+    rule_id: str
+    count: int
+
+
 class StatsResponse(BaseModel):
     """Aggregate metrics for the dashboard."""
 
     total_scans: int
     repositories_scanned: int
+    repositories_ready: int = 0
     critical_issues: int
     high_issues: int
     average_readiness: float
+    total_findings: int = 0
+    severity_counts: dict[str, int] = {}
+    category_counts: dict[str, int] = {}
+    top_rules: list[TopRule] = []
     latest_scans: list[ScanSummary]
 
 

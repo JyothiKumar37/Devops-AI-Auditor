@@ -13,6 +13,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 @router.get("", response_model=StatsResponse, summary="Aggregate dashboard metrics")
 async def get_stats(service: ScanServiceDep) -> StatsResponse:
     data = await service.get_stats()
+    readiness_by_scan = data.pop("readiness_by_scan", {})
     latest = [
         ScanSummary(
             id=scan.id,
@@ -24,6 +25,7 @@ async def get_stats(service: ScanServiceDep) -> StatsResponse:
             completed_at=scan.completed_at,
             error_message=scan.error_message,
             file_count=count,
+            readiness=readiness_by_scan.get(scan.id),
         )
         for scan, count in data.pop("latest_scans")
     ]

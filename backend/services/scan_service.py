@@ -231,13 +231,38 @@ class ScanService:
         ).all():
             sev_counts[str(sev)] = int(count)
 
-        # Average readiness across completed scans (deterministic engine, no LLM).
+        # Findings grouped by category (where the risk concentrates).
+        category_counts: dict[str, int] = {}
+        for cat, count in (
+            await self._session.execute(
+                select(Finding.category, func.count()).group_by(Finding.category)
+            )
+        ).all():
+            category_counts[str(cat)] = int(count)
+
+        # Most frequently recurring rules across all scans.
+        top_rules = [
+            {"rule_id": str(rule_id), "count": int(count)}
+            for rule_id, count in (
+                await self._session.execute(
+                    select(Finding.rule_id, func.count())
+                    .group_by(Finding.rule_id)
+                    .order_by(func.count().desc())
+                    .limit(8)
+                )
+            ).all()
+        ]
+
+        # Average readiness across completed scans (deterministic engine, no LLM),
+        # plus the per-scan score and how many scans are production-ready.
         completed = (
             await self._session.scalars(
                 select(Scan).where(Scan.status == ScanStatus.COMPLETED)
             )
         ).all()
         scores: list[int] = []
+        readiness_by_scan: dict[uuid.UUID, int] = {}
+        repositories_ready = 0
         for scan in completed:
             findings = [
                 self._finding_dict(f)
@@ -257,16 +282,26 @@ class ScanService:
                     )
                 ).all()
             ]
-            scores.append(assess(findings, files).score)
+            report = assess(findings, files)
+            scores.append(report.score)
+            readiness_by_scan[scan.id] = report.score
+            if report.ready:
+                repositories_ready += 1
         average_readiness = round(sum(scores) / len(scores), 1) if scores else 0.0
 
         latest_rows, _ = await self.list_scans(limit=8, offset=0)
         return {
             "total_scans": total_scans,
             "repositories_scanned": repositories,
+            "repositories_ready": repositories_ready,
             "critical_issues": sev_counts.get("critical", 0),
             "high_issues": sev_counts.get("high", 0),
             "average_readiness": average_readiness,
+            "total_findings": sum(sev_counts.values()),
+            "severity_counts": sev_counts,
+            "category_counts": category_counts,
+            "top_rules": top_rules,
+            "readiness_by_scan": readiness_by_scan,
             "latest_scans": latest_rows,
         }
 

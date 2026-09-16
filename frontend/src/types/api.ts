@@ -38,6 +38,7 @@ export interface ScanSummary {
   completed_at: string | null;
   error_message: string | null;
   file_count: number;
+  readiness?: number | null;
 }
 
 export interface ScanListResponse {
@@ -195,12 +196,22 @@ export interface RepositoryFileContent {
   content: string | null;
 }
 
+export interface TopRule {
+  rule_id: string;
+  count: number;
+}
+
 export interface StatsResponse {
   total_scans: number;
   repositories_scanned: number;
+  repositories_ready: number;
   critical_issues: number;
   high_issues: number;
   average_readiness: number;
+  total_findings: number;
+  severity_counts: Record<string, number>;
+  category_counts: Record<string, number>;
+  top_rules: TopRule[];
   latest_scans: ScanSummary[];
 }
 
