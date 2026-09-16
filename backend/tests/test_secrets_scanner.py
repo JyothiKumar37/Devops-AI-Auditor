@@ -48,11 +48,27 @@ def test_findings_have_required_fields() -> None:
 
 
 def test_private_key_detection_is_redacted() -> None:
-    text = "-----BEGIN RSA PRIVATE KEY-----\nMIIEabcdef...\n-----END RSA PRIVATE KEY-----\n"
+    body = (
+        "MIIEowIBAAKCAQEA7Yb3Q2xR5mN8pQ2vK9wL1sT4uV6xY0zA3bC5dE7fG9hJ2kM\n"
+        "4nP6qR8sT0uV2wX4yZ6aB8cD0eF2gH4iJ6kL8mN0oP2qR4sT6uV8wX0yZ2aB4cD"
+    )
+    text = f"-----BEGIN RSA PRIVATE KEY-----\n{body}\n-----END RSA PRIVATE KEY-----\n"
     findings = SecretScanner().scan_text("id_rsa", text)
     key = next(f for f in findings if f.rule_id == "SEC007")
     assert key.severity == Severity.CRITICAL
-    assert "MIIEabcdef" not in (key.evidence or "")
+    assert "MIIEowIBAAKCAQEA" not in (key.evidence or "")
+
+
+def test_private_key_header_mention_is_not_flagged() -> None:
+    # A bare header with no key material (a detector's own pattern, docs, or a
+    # redacted evidence literal) must NOT be reported as a committed key.
+    for benign in (
+        'PRIVATE_KEY_RE = re.compile(r"-----BEGIN (?:RSA |)PRIVATE KEY-----")',
+        'evidence = "-----BEGIN PRIVATE KEY----- (redacted)"',
+        "# see -----BEGIN PRIVATE KEY----- in the PEM format docs",
+    ):
+        ids = {f.rule_id for f in SecretScanner().scan_text("scanners/x.py", benign)}
+        assert "SEC007" not in ids, benign
 
 
 def test_duplicate_detectors_collapse_to_most_severe() -> None:

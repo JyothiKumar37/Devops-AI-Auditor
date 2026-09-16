@@ -82,7 +82,16 @@ DETECTORS: list[Detector] = [
 ]
 
 # Private keys span multiple lines; detected against the whole file text.
-PRIVATE_KEY_RE = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP |)PRIVATE KEY-----")
+# A real PEM key is the header followed by actual base64 key material. Requiring
+# the body (not just the header) avoids flagging pattern/evidence literals that
+# merely mention "-----BEGIN PRIVATE KEY-----" (e.g. this scanner's own source,
+# docs, or redacted evidence strings). The short separator run tolerates the
+# newline in a PEM block and the escaped "\n" in a JSON/env-embedded key.
+PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----"
+    r"[\s\"'\\rn]{0,8}"
+    r"[A-Za-z0-9+/]{40,}"
+)
 
 _GENERIC_RE = re.compile(
     r"(?i)\b([A-Za-z_]*(?:password|passwd|secret|api[_-]?key|apikey|access[_-]?key|"
