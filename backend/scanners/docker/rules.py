@@ -358,6 +358,13 @@ def _check_layers(df: Dockerfile, emit: _Emitter) -> None:
 
 
 def _check_package_cache(df: Dockerfile, emit: _Emitter) -> None:
+    # `ENV PIP_NO_CACHE_DIR=1` disables the pip cache image-wide, which is
+    # equivalent to passing --no-cache-dir on every install, so do not flag pip
+    # installs when it is set to a truthy value.
+    pip_cache_off = any(
+        re.search(r"PIP_NO_CACHE_DIR\s*=?\s*(?:1|true|on|yes)\b", i.value, re.IGNORECASE)
+        for i in df.by_cmd("ENV")
+    )
     for instr in df.by_cmd("RUN"):
         cmd = instr.value
         low = cmd.lower()
@@ -378,7 +385,11 @@ def _check_package_cache(df: Dockerfile, emit: _Emitter) -> None:
                 line=instr.line,
                 evidence=f"RUN {cmd[:100]}",
             )
-        if re.search(r"\bpip3?\s+install\b", low) and "--no-cache-dir" not in low:
+        if (
+            re.search(r"\bpip3?\s+install\b", low)
+            and "--no-cache-dir" not in low
+            and not pip_cache_off
+        ):
             emit.add(
                 "DCK008",
                 description="pip install without --no-cache-dir keeps the wheel cache.",

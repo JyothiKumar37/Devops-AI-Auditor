@@ -142,3 +142,18 @@ def test_findings_carry_full_schema() -> None:
     assert finding.line_number is not None
     assert finding.confidence is not None
     assert finding.category is not None
+
+
+def test_pip_cache_env_suppresses_dck008() -> None:
+    # `ENV PIP_NO_CACHE_DIR=1` disables the pip cache, so `pip install` without
+    # --no-cache-dir must NOT be flagged (regression: DCK008 false positive).
+    with_env = (
+        "FROM python:3.11-slim\n"
+        "ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1\n"
+        "RUN pip install --upgrade pip && pip install .\n"
+    )
+    assert "DCK008" not in _rule_ids(with_env)
+
+    # Without the env (and without --no-cache-dir) it is still flagged.
+    without_env = "FROM python:3.11-slim\nRUN pip install .\n"
+    assert "DCK008" in _rule_ids(without_env)
