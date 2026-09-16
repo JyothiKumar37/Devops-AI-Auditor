@@ -1,5 +1,5 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { Spinner } from "@/components/ui";
 import { useFileContent } from "@/hooks/useScans";
@@ -8,43 +8,85 @@ import { monacoLanguage } from "@/lib/format";
 type MonacoEditor = Parameters<OnMount>[0];
 type Monaco = Parameters<OnMount>[1];
 
+export interface CodeMarker {
+  line: number;
+  message?: string;
+}
+
 interface CodeViewerProps {
   scanId: string;
   fileId: string | null;
   path?: string;
   fileType?: string;
+  /** A single line to reveal/focus (e.g. from a finding detail view). */
   highlightLine?: number | null;
+  /** All finding lines in the file — highlighted in red. */
+  markers?: CodeMarker[];
 }
 
-export function CodeViewer({ scanId, fileId, path, fileType, highlightLine }: CodeViewerProps) {
+export function CodeViewer({
+  scanId,
+  fileId,
+  path,
+  fileType,
+  highlightLine,
+  markers,
+}: CodeViewerProps) {
   const { data, isLoading, isError } = useFileContent(scanId, fileId);
   const editorRef = useRef<MonacoEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
 
-  const applyHighlight = useCallback(
-    (ed: MonacoEditor, monaco: Monaco) => {
-      if (!highlightLine) return;
-      decorationsRef.current = ed.deltaDecorations(decorationsRef.current, [
-        {
-          range: new monaco.Range(highlightLine, 1, highlightLine, 1),
-          options: {
-            isWholeLine: true,
-            className: "bg-amber-100",
-            marginClassName: "bg-amber-200",
-            linesDecorationsClassName: "border-l-2 border-amber-500",
+  const applyHighlight = useCallback(() => {
+    const ed = editorRef.current;
+    const monaco = monacoRef.current;
+    if (!ed || !monaco) return;
+
+    // Collect every line that has a finding (deduped, keeping a message).
+    const lines = new Map<number, string | undefined>();
+    (markers ?? []).forEach((m) => {
+      if (m.line && m.line > 0) lines.set(m.line, m.message);
+    });
+    if (highlightLine && highlightLine > 0 && !lines.has(highlightLine)) {
+      lines.set(highlightLine, undefined);
+    }
+
+    decorationsRef.current = ed.deltaDecorations(
+      decorationsRef.current,
+      [...lines.entries()].map(([line, message]) => ({
+        range: new monaco.Range(line, 1, line, 1),
+        options: {
+          isWholeLine: true,
+          className: "bg-rose-100",
+          marginClassName: "bg-rose-200",
+          linesDecorationsClassName: "border-l-2 border-rose-500",
+          overviewRuler: {
+            color: "rgba(225, 29, 72, 0.85)",
+            position: monaco.editor.OverviewRulerLane.Full,
           },
+          ...(message ? { hoverMessage: { value: message } } : {}),
         },
-      ]);
-      ed.revealLineInCenter(highlightLine);
-      ed.setPosition({ lineNumber: highlightLine, column: 1 });
-    },
-    [highlightLine],
-  );
+      })),
+    );
+
+    const focus = highlightLine ?? [...lines.keys()].sort((a, b) => a - b)[0];
+    if (focus) {
+      ed.revealLineInCenter(focus);
+      ed.setPosition({ lineNumber: focus, column: 1 });
+    }
+  }, [markers, highlightLine]);
 
   const onMount: OnMount = (ed, monaco) => {
     editorRef.current = ed;
-    applyHighlight(ed, monaco);
+    monacoRef.current = monaco;
+    decorationsRef.current = [];
+    applyHighlight();
   };
+
+  // Re-apply when findings or the loaded content change (they can arrive after mount).
+  useEffect(() => {
+    applyHighlight();
+  }, [applyHighlight, data]);
 
   if (!fileId) {
     return (
@@ -88,6 +130,7 @@ export function CodeViewer({ scanId, fileId, path, fileType, highlightLine }: Co
         minimap: { enabled: false },
         fontSize: 13,
         lineNumbers: "on",
+        glyphMargin: true,
         scrollBeyondLastLine: false,
         renderLineHighlight: "none",
         padding: { top: 12, bottom: 12 },
