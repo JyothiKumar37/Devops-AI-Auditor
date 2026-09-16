@@ -12,10 +12,10 @@ from scanners.secrets.scanner import SecretScanner
 # runtime) so no contiguous real-format token is committed - this keeps the
 # fixture realistic for the scanner without tripping GitHub push protection.
 RAW_SECRETS = [
-    "AKIAIOSFODNN7EXAMPLE",
+    "AKIAZXQ27R5MN8PQ3VK9",
     "ghp_1234567890abcdef" "ghijklmnopqrstuvwxyz",
     "SuperSecretDbPassword99",
-    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123",
 ]
 
 SAMPLE = f"""\
@@ -74,7 +74,7 @@ def test_private_key_header_mention_is_not_flagged() -> None:
 def test_duplicate_detectors_collapse_to_most_severe() -> None:
     # access_key assignment matches both the AWS pattern (SEC001) and the generic
     # credential rule (SEC010); the result is a single CRITICAL finding.
-    findings = SecretScanner().scan_text("f.env", 'access_key = "AKIAIOSFODNN7EXAMPLE"')
+    findings = SecretScanner().scan_text("f.env", 'access_key = "AKIAZXQ27R5MN8PQ3VK9"')
     assert len(findings) == 1
     assert findings[0].rule_id == "SEC001"
 
@@ -118,7 +118,7 @@ def test_commented_out_credentials_are_skipped() -> None:
     assert any(f.rule_id == "SEC010" for f in findings)
 
     # A genuine structured secret is still caught even inside a comment.
-    aws = SecretScanner().scan_text("app.js", "# AWS_KEY = AKIAIOSFODNN7EXAMPLE")
+    aws = SecretScanner().scan_text("app.js", "# AWS_KEY = AKIAZXQ27R5MN8PQ3VK9")
     assert any(f.rule_id == "SEC001" for f in aws)
 
 

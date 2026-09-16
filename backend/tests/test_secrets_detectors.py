@@ -14,8 +14,8 @@ def _ids(text: str) -> set[str]:
 @pytest.mark.parametrize(
     ("text", "rule_id"),
     [
-        ('key = "AKIAIOSFODNN7EXAMPLE"', "SEC001"),
-        ('aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"', "SEC002"),
+        ('key = "AKIAZXQ27R5MN8PQ3VK9"', "SEC001"),
+        ('aws_secret_access_key = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJ0123"', "SEC002"),
         # Provider tokens are split into adjacent string literals (Python joins
         # them at runtime) so this test file contains no contiguous real-format
         # token that would trip GitHub push protection, while still exercising
@@ -29,6 +29,13 @@ def _ids(text: str) -> set[str]:
 )
 def test_typed_detectors(text: str, rule_id: str) -> None:
     assert rule_id in _ids(text)
+
+
+def test_documented_example_credentials_are_not_flagged() -> None:
+    # AWS publishes these as non-functional examples; every real scanner
+    # allowlists them, so they must not be reported as committed secrets.
+    assert _ids('key = "AKIAIOSFODNN7EXAMPLE"') == set()
+    assert _ids('aws_secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"') == set()
 
 
 def test_jwt_detection() -> None:

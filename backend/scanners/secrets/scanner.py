@@ -22,6 +22,7 @@ from scanners.secrets.detectors import (
     RULES,
     find_generic_credentials,
     find_high_entropy_tokens,
+    is_placeholder,
 )
 from scanners.secrets.masking import mask_secret
 
@@ -76,6 +77,11 @@ class SecretScanner:
                 for match in detector.pattern.finditer(raw_line):
                     value = match.group(detector.value_group)
                     if not value:
+                        continue
+                    # Skip well-known documentation placeholders (e.g. AWS's
+                    # AKIAIOSFODNN7EXAMPLE / ...EXAMPLEKEY), which are published
+                    # non-functional examples, not real committed secrets.
+                    if is_placeholder(value):
                         continue
                     structured_values.add(value)
                     if detector.rule_id == "SEC009":
