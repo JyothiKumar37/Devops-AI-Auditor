@@ -10,8 +10,36 @@ type Monaco = Parameters<OnMount>[1];
 
 export interface CodeMarker {
   line: number;
+  severity?: string;
   message?: string;
 }
+
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+
+// Per-severity editor decoration styling (static classes so Tailwind keeps them).
+const SEVERITY_DECOR: Record<
+  string,
+  { line: string; margin: string; border: string; ruler: string }
+> = {
+  critical: { line: "bg-rose-100", margin: "bg-rose-200", border: "border-rose-500", ruler: "rgba(225,29,72,0.85)" },
+  high: { line: "bg-orange-100", margin: "bg-orange-200", border: "border-orange-500", ruler: "rgba(234,88,12,0.85)" },
+  medium: { line: "bg-amber-100", margin: "bg-amber-200", border: "border-amber-500", ruler: "rgba(217,119,6,0.85)" },
+  low: { line: "bg-sky-100", margin: "bg-sky-200", border: "border-sky-500", ruler: "rgba(2,132,199,0.8)" },
+  info: { line: "bg-slate-100", margin: "bg-slate-200", border: "border-slate-400", ruler: "rgba(100,116,139,0.7)" },
+};
+
+const DEFAULT_DECOR = {
+  line: "bg-rose-100",
+  margin: "bg-rose-200",
+  border: "border-rose-500",
+  ruler: "rgba(225,29,72,0.85)",
+};
 
 interface CodeViewerProps {
   scanId: string;
@@ -42,31 +70,51 @@ export function CodeViewer({
     const monaco = monacoRef.current;
     if (!ed || !monaco) return;
 
-    // Collect every line that has a finding (deduped, keeping a message).
-    const lines = new Map<number, string | undefined>();
-    (markers ?? []).forEach((m) => {
-      if (m.line && m.line > 0) lines.set(m.line, m.message);
-    });
+    // Collect every line that has a finding, keeping the highest severity per
+    // line (and counting the rest for the tooltip).
+    type LineInfo = { rank: number; severity: string; message?: string; count: number };
+    const lines = new Map<number, LineInfo>();
+    const add = (line: number, severity: string, message?: string) => {
+      if (!line || line <= 0) return;
+      const rank = SEVERITY_RANK[severity] ?? 3;
+      const cur = lines.get(line);
+      if (!cur) {
+        lines.set(line, { rank, severity, message, count: 1 });
+      } else {
+        cur.count += 1;
+        if (rank > cur.rank) {
+          cur.rank = rank;
+          cur.severity = severity;
+          cur.message = message;
+        }
+      }
+    };
+    (markers ?? []).forEach((m) => add(m.line, m.severity ?? "high", m.message));
     if (highlightLine && highlightLine > 0 && !lines.has(highlightLine)) {
-      lines.set(highlightLine, undefined);
+      add(highlightLine, "high", undefined);
     }
 
     decorationsRef.current = ed.deltaDecorations(
       decorationsRef.current,
-      [...lines.entries()].map(([line, message]) => ({
-        range: new monaco.Range(line, 1, line, 1),
-        options: {
-          isWholeLine: true,
-          className: "bg-rose-100",
-          marginClassName: "bg-rose-200",
-          linesDecorationsClassName: "border-l-2 border-rose-500",
-          overviewRuler: {
-            color: "rgba(225, 29, 72, 0.85)",
-            position: monaco.editor.OverviewRulerLane.Full,
+      [...lines.entries()].map(([line, info]) => {
+        const d = SEVERITY_DECOR[info.severity] ?? DEFAULT_DECOR;
+        const message =
+          info.count > 1 && info.message ? `${info.message} (+${info.count - 1} more)` : info.message;
+        return {
+          range: new monaco.Range(line, 1, line, 1),
+          options: {
+            isWholeLine: true,
+            className: d.line,
+            marginClassName: d.margin,
+            linesDecorationsClassName: `border-l-2 ${d.border}`,
+            overviewRuler: {
+              color: d.ruler,
+              position: monaco.editor.OverviewRulerLane.Full,
+            },
+            ...(message ? { hoverMessage: { value: message } } : {}),
           },
-          ...(message ? { hoverMessage: { value: message } } : {}),
-        },
-      })),
+        };
+      }),
     );
 
     const focus = highlightLine ?? [...lines.keys()].sort((a, b) => a - b)[0];

@@ -148,6 +148,17 @@ export default function FindingDetails() {
               path={file?.path}
               fileType={file?.file_type}
               highlightLine={finding.line_number}
+              markers={
+                finding.line_number
+                  ? [
+                      {
+                        line: finding.line_number,
+                        severity: finding.severity,
+                        message: `${finding.severity.toUpperCase()} · ${finding.rule_id}: ${finding.title}`,
+                      },
+                    ]
+                  : []
+              }
             />
           </div>
         </Card>

@@ -4,8 +4,10 @@ import { useParams } from "react-router-dom";
 import { CodeViewer, type CodeMarker } from "@/components/CodeViewer";
 import { Card, Spinner } from "@/components/ui";
 import { useFindings, useScanFiles } from "@/hooks/useScans";
-import { formatBytes, prettyLabel } from "@/lib/format";
+import { formatBytes, prettyLabel, severityMeta } from "@/lib/format";
 import type { RepositoryFile } from "@/types/api";
+
+const SEV_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1, info: 0 };
 
 export default function RepositoryFiles() {
   const { scanId } = useParams();
@@ -16,10 +18,20 @@ export default function RepositoryFiles() {
   const [search, setSearch] = useState("");
 
   const findings = useMemo(() => findingsData?.items ?? [], [findingsData]);
-  const countByFile = useMemo(() => {
-    const m = new Map<string, number>();
+  const fileMeta = useMemo(() => {
+    const m = new Map<string, { count: number; worst: string; rank: number }>();
     findings.forEach((f) => {
-      if (f.file_id) m.set(f.file_id, (m.get(f.file_id) ?? 0) + 1);
+      if (!f.file_id) return;
+      const rank = SEV_RANK[f.severity] ?? 0;
+      const cur = m.get(f.file_id);
+      if (!cur) m.set(f.file_id, { count: 1, worst: f.severity, rank });
+      else {
+        cur.count += 1;
+        if (rank > cur.rank) {
+          cur.rank = rank;
+          cur.worst = f.severity;
+        }
+      }
     });
     return m;
   }, [findings]);
@@ -44,6 +56,7 @@ export default function RepositoryFiles() {
       .filter((f) => f.file_id === active.id && f.line_number)
       .map((f) => ({
         line: f.line_number as number,
+        severity: f.severity,
         message: `${f.severity.toUpperCase()} · ${f.rule_id}: ${f.title}`,
       }));
   }, [findings, active]);
@@ -77,9 +90,13 @@ export default function RepositoryFiles() {
                 >
                   <span className="truncate font-mono">{f.path}</span>
                   <span className="flex shrink-0 items-center gap-1.5">
-                    {countByFile.get(f.id) ? (
-                      <span className="rounded-full bg-rose-50 px-1.5 font-medium tabular-nums text-rose-700 ring-1 ring-inset ring-rose-600/20">
-                        {countByFile.get(f.id)}
+                    {fileMeta.get(f.id) ? (
+                      <span
+                        className={`rounded-full px-1.5 font-medium tabular-nums ring-1 ring-inset ${
+                          severityMeta(fileMeta.get(f.id)!.worst).badge
+                        }`}
+                      >
+                        {fileMeta.get(f.id)!.count}
                       </span>
                     ) : null}
                     <span className="text-slate-400">{formatBytes(f.size)}</span>
@@ -96,9 +113,11 @@ export default function RepositoryFiles() {
           <span className="truncate font-mono text-xs text-slate-500">
             {active?.path ?? "Select a file"}
           </span>
-          {markers.length ? (
-            <span className="shrink-0 text-xs font-medium text-rose-700">
-              {markers.length} finding{markers.length === 1 ? "" : "s"}
+          {active && fileMeta.get(active.id) ? (
+            <span
+              className={`shrink-0 text-xs font-medium ${severityMeta(fileMeta.get(active.id)!.worst).text}`}
+            >
+              {fileMeta.get(active.id)!.count} finding{fileMeta.get(active.id)!.count === 1 ? "" : "s"}
             </span>
           ) : null}
         </div>
