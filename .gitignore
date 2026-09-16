@@ -40,3 +40,6 @@ reports/*
 postgres-data/
 redis-data/
 *.log
+
+# Local persistent data (Postgres/Redis bind mounts from docker-compose)
+data/

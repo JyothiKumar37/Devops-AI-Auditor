@@ -6,6 +6,11 @@
 # the compose network so containers reach each other by name.
 # =============================================================================
 
+# A fixed project name so volume/container names stay stable regardless of the
+# directory this file is run from (a renamed/re-cloned folder would otherwise
+# create a brand-new, empty set of volumes and look like "lost data").
+name: devops-ai-auditor
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -16,7 +21,9 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # Host bind mount: the database lives in ./data/postgres on the host, so it
+      # survives `docker compose down` (and even `down -v`), rebuilds and renames.
+      - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auditor} -d ${POSTGRES_DB:-auditor}"]
       interval: 5s
@@ -28,7 +35,7 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
-      - redis-data:/data
+      - ./data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -92,6 +99,6 @@ services:
     depends_on:
       - backend
 
-volumes:
-  postgres-data:
-  redis-data:
+# Data is persisted via host bind mounts under ./data (see the postgres and
+# redis services), so no named volumes are declared here — nothing to be
+# removed by `docker compose down -v`.
