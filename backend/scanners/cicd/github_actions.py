@@ -19,6 +19,7 @@ from scanners.cicd.common import (
     is_reference_value,
     looks_like_secret_value,
     mask,
+    strip_shell_comment_lines,
 )
 from scanners.finding import RuleFinding
 from scanners.yaml_lines import YamlSyntaxError, line_of, load_documents
@@ -231,18 +232,19 @@ def _check_step(step: dict, emit: Emitter) -> None:
     run = step.get("run")
     if isinstance(run, str):
         run_line = line_of(step, "run")
-        untrusted = _UNTRUSTED_CONTEXT_RE.search(run)
+        code = strip_shell_comment_lines(run)  # ignore commented-out shell lines
+        untrusted = _UNTRUSTED_CONTEXT_RE.search(code)
         if untrusted:
             emit.add("GHA004", description="Untrusted input is interpolated into a run script.",
                      line=run_line, evidence=untrusted.group(0))
-        if _ECHO_SECRET_RE.search(run):
+        if _ECHO_SECRET_RE.search(code):
             emit.add("GHA009", description="A secret is echoed to the build log.",
                      line=run_line)
-        if CURL_PIPE_SH_RE.search(run):
+        if CURL_PIPE_SH_RE.search(code):
             emit.add("GHA014", description="A remote script is piped into a shell.",
                      line=run_line)
-        pw = _DOCKER_LOGIN_PW_RE.search(run)
-        if pw and not pw.group(1).startswith("$") and "--password-stdin" not in run:
+        pw = _DOCKER_LOGIN_PW_RE.search(code)
+        if pw and not pw.group(1).startswith("$") and "--password-stdin" not in code:
             emit.add("GHA010", description="docker login uses an inline password.",
                      line=run_line, evidence="docker login -p ****")
 

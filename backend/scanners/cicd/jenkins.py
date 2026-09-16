@@ -67,8 +67,23 @@ _SAFE_MARKERS = ("credentials(", "withCredentials", "credentialsId")
 
 def analyze_jenkinsfile(file_path: str, text: str) -> list[RuleFinding]:
     emit = Emitter(RULES, SCANNER_NAME, file_path)
+    in_block_comment = False
     for index, line in enumerate(text.splitlines()):
         line_no = index + 1
+        stripped = line.strip()
+
+        # Skip Groovy comments so commented-out code is not reported as a finding.
+        if in_block_comment:
+            if "*/" in stripped:
+                in_block_comment = False
+            continue
+        if stripped.startswith("/*"):
+            if "*/" not in stripped:
+                in_block_comment = True
+            continue
+        if stripped.startswith("//") or stripped.startswith("*"):
+            continue
+
         has_safe_marker = any(marker in line for marker in _SAFE_MARKERS)
 
         if PRIVATE_KEY_RE.search(line):

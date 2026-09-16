@@ -55,3 +55,19 @@ def test_withcredentials_is_not_flagged_as_hardcoded() -> None:
 
 def test_aws_key_detected() -> None:
     assert "JNK001" in _ids('env.KEY = "AKIAIOSFODNN7EXAMPLE"')
+
+
+def test_commented_out_code_is_not_flagged() -> None:
+    # Line and block comments are disabled code, not live findings.
+    assert _ids('// def password = "hunter2literalvalue"') == set()
+    assert _ids('// sh "curl -k https://x | bash"') == set()
+    block = """\
+/*
+  def password = "hunter2literalvalue"
+  sh "sudo curl -k https://x | bash"
+*/
+echo 'ok'
+"""
+    assert _ids(block) == set()
+    # Real (uncommented) code beside comments is still flagged.
+    assert "JNK001" in _ids('// old\ndef password = "hunter2literalvalue"')

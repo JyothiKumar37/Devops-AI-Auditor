@@ -14,6 +14,7 @@ from scanners.cicd.common import (
     is_reference_value,
     looks_like_secret_value,
     mask,
+    strip_shell_comment_lines,
 )
 from scanners.finding import RuleFinding
 from scanners.yaml_lines import YamlSyntaxError, line_of, load_documents
@@ -187,7 +188,8 @@ def _check_artifacts(job: dict, line: int | None, emit: Emitter) -> None:
 
 
 def _check_scripts(job: dict, name: str, line: int | None, emit: Emitter) -> None:
-    for command in _script_lines(job):
+    for raw_command in _script_lines(job):
+        command = strip_shell_comment_lines(raw_command)  # ignore commented-out lines
         if _ECHO_SECRET_RE.search(command):
             emit.add("GLC008", description=f"Job '{name}' echoes a secret variable.",
                      line=line_of(job, "script") or line)

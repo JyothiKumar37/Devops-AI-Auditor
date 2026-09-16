@@ -81,6 +81,13 @@ CURL_PIPE_SH_RE = re.compile(
 INSECURE_TLS_RE = re.compile(r"(--insecure|\s-k\b|--no-check-certificate)", re.IGNORECASE)
 
 
+def strip_shell_comment_lines(text: str) -> str:
+    """Drop whole-line shell comments (``# ...``) so commented-out commands are
+    not matched by the shell-command detectors. Inline ``#`` is left intact to
+    avoid touching values that legitimately contain it."""
+    return "\n".join(line for line in text.splitlines() if not line.strip().startswith("#"))
+
+
 def is_reference_value(value: str) -> bool:
     """True if a value is a CI variable/secret reference rather than a literal.
 
