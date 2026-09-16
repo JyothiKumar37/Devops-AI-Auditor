@@ -86,6 +86,26 @@ def test_template_and_test_files_downrank_secrets() -> None:
     assert test and all(f.severity == Severity.LOW for f in test)
 
 
+def test_commented_out_credentials_are_skipped() -> None:
+    # Generic/high-entropy matches inside comments are disabled code, not live
+    # secrets, and must not be reported (they land highlights on comment lines).
+    for comment in (
+        '// password = "realL00kingSecretValue"',
+        '# api_key = "realL00kingSecretValue"',
+        '   * token = "realL00kingSecretValue"',
+        '-- secret = "realL00kingSecretValue"',
+    ):
+        assert SecretScanner().scan_text("app.js", comment) == [], comment
+
+    # The same assignment as real code (not a comment) is still flagged.
+    findings = SecretScanner().scan_text("app.js", 'api_key = "realL00kingSecretValue"')
+    assert any(f.rule_id == "SEC010" for f in findings)
+
+    # A genuine structured secret is still caught even inside a comment.
+    aws = SecretScanner().scan_text("app.js", "# AWS_KEY = AKIAIOSFODNN7EXAMPLE")
+    assert any(f.rule_id == "SEC001" for f in aws)
+
+
 def test_clean_file_has_no_findings() -> None:
     text = "name = \"my-app\"\nversion = \"1.2.3\"\ndebug = false\n"
     assert SecretScanner().scan_text("config.toml", text) == []

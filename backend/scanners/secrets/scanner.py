@@ -29,6 +29,18 @@ logger = get_logger(__name__)
 
 _MAX_FILE_BYTES = 5 * 1024 * 1024
 _BINARY_SNIFF = 8192
+
+# A commented-out line is code the author disabled, not a live secret. The
+# low-precision generic (SEC010) and high-entropy (SEC011) detectors skip such
+# lines so example/placeholder credentials in comments are not reported. Real
+# structured secrets (AWS keys, private keys, DB URLs, provider tokens) are
+# still detected even inside comments, since committing those is a genuine leak.
+_COMMENT_PREFIXES = ("#", "//", "/*", "*", "<!--", "--", ";", "'''", '"""')
+
+
+def _is_comment_line(raw_line: str) -> bool:
+    return raw_line.strip().startswith(_COMMENT_PREFIXES)
+
 _LOCKFILE_NAMES = {
     "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "go.sum", "cargo.lock",
     "composer.lock", "gemfile.lock", "poetry.lock", "pipfile.lock",
@@ -58,6 +70,7 @@ class SecretScanner:
         for index, raw_line in enumerate(text.splitlines()):
             line_no = index + 1
             structured_values: set[str] = set()
+            is_comment = _is_comment_line(raw_line)
 
             for detector in DETECTORS:
                 for match in detector.pattern.finditer(raw_line):
@@ -73,15 +86,16 @@ class SecretScanner:
                         self._finding(detector.rule_id, file_path, line_no, evidence)
                     )
 
-            for _key, value in find_generic_credentials(raw_line):
-                if value in structured_values:
-                    continue
-                structured_values.add(value)
-                candidates.append(
-                    self._finding("SEC010", file_path, line_no, mask_secret(value))
-                )
+            if not is_comment:
+                for _key, value in find_generic_credentials(raw_line):
+                    if value in structured_values:
+                        continue
+                    structured_values.add(value)
+                    candidates.append(
+                        self._finding("SEC010", file_path, line_no, mask_secret(value))
+                    )
 
-            if not is_lockfile:
+            if not is_lockfile and not is_comment:
                 for token in find_high_entropy_tokens(raw_line):
                     if token in structured_values:
                         continue
