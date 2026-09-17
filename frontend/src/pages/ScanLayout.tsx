@@ -36,12 +36,17 @@ export default function ScanLayout() {
 
   return (
     <div>
-      <div className="mb-4">
-        <NavLink to="/scans" className="text-xs text-slate-500 hover:text-slate-700">
+      <div className="mb-4 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-soft sm:p-5">
+        <NavLink to="/scans" className="text-xs font-medium text-slate-500 hover:text-brand">
           ← All scans
         </NavLink>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">
+          <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-gradient text-white shadow-glow">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16M4 12h16M4 17h10" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">
             {scan?.repository_name ?? "Scan"}
           </h1>
           {scan ? <ScanStatusBadge status={scan.status} /> : null}
@@ -52,7 +57,7 @@ export default function ScanLayout() {
           ) : null}
         </div>
         {scan ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 rounded-lg bg-slate-50 px-3 py-2 text-xs">
             <Meta label="source" value={prettyLabel(scan.source_type)} />
             <Meta label="files" value={String(scan.file_count)} mono />
             <Meta label="created" value={relativeTime(scan.created_at)} />
@@ -70,19 +75,27 @@ export default function ScanLayout() {
               to={tab.to}
               end={tab.end}
               className={({ isActive }) =>
-                `-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${
+                `-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-semibold transition-colors ${
                   isActive
-                    ? "border-slate-900 text-slate-900"
+                    ? "border-brand text-brand-deep"
                     : "border-transparent text-slate-500 hover:text-slate-800"
                 }`
               }
             >
-              {tab.label}
-              {typeof count === "number" ? (
-                <span className="rounded-full bg-slate-100 px-1.5 text-[10px] font-medium tabular-nums text-slate-500">
-                  {count}
-                </span>
-              ) : null}
+              {({ isActive }) => (
+                <>
+                  {tab.label}
+                  {typeof count === "number" ? (
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                        isActive ? "bg-brand-50 text-brand-deep" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  ) : null}
+                </>
+              )}
             </NavLink>
           );
         })}

@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Card, EmptyState, Field, SeverityPill, Spinner } from "@/components/ui";
 import { useFindings, useScanFiles } from "@/hooks/useScans";
-import { SEVERITY_ORDER, prettyLabel } from "@/lib/format";
+import { SEVERITY_ORDER, prettyLabel, severityMeta } from "@/lib/format";
 import type { Finding } from "@/types/api";
 
 function Select({
@@ -32,11 +32,14 @@ function Select({
 export default function Findings() {
   const { scanId } = useParams();
   const id = scanId ?? null;
+  const [searchParams] = useSearchParams();
   const { data, isLoading } = useFindings(id, {});
   const { data: files } = useScanFiles(id);
 
-  const [severity, setSeverity] = useState("");
-  const [category, setCategory] = useState("");
+  // Seed from the URL so deep-links (e.g. ?severity=critical from the
+  // dashboard or overview) open pre-filtered.
+  const [severity, setSeverity] = useState(() => searchParams.get("severity") ?? "");
+  const [category, setCategory] = useState(() => searchParams.get("category") ?? "");
   const [scanner, setScanner] = useState("");
   const [confidence, setConfidence] = useState("");
   const [fileType, setFileType] = useState("");
@@ -58,6 +61,14 @@ export default function Findings() {
     };
   }, [items, fileById]);
 
+  const severityCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    items.forEach((f) => {
+      m[f.severity] = (m[f.severity] ?? 0) + 1;
+    });
+    return m;
+  }, [items]);
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return items.filter((f) => {
@@ -75,9 +86,45 @@ export default function Findings() {
     });
   }, [items, severity, category, scanner, confidence, fileType, search, fileById]);
 
+  const activeFilters =
+    Boolean(severity || category || scanner || confidence || fileType || search.trim());
+
   return (
-    <div>
-      <Card className="mb-4 p-4">
+    <div className="space-y-4">
+      {/* Severity summary strip — click a severity to filter. */}
+      <Card className="flex flex-wrap items-center gap-2 p-3">
+        <button
+          type="button"
+          onClick={() => setSeverity("")}
+          className={`chip transition-colors ${
+            severity === ""
+              ? "bg-slate-900 text-white ring-slate-900"
+              : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-50"
+          }`}
+        >
+          All · {items.length}
+        </button>
+        {SEVERITY_ORDER.map((sev) => {
+          const count = severityCounts[sev] ?? 0;
+          const active = severity === sev;
+          const meta = severityMeta(sev);
+          return (
+            <button
+              key={sev}
+              type="button"
+              onClick={() => setSeverity(active ? "" : sev)}
+              className={`chip transition-all ${
+                active ? `${meta.badge} ring-2` : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden />
+              {meta.label} · {count}
+            </button>
+          );
+        })}
+      </Card>
+
+      <Card className="p-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <Field label="Search">
             <input
@@ -108,29 +155,48 @@ export default function Findings() {
       {isLoading ? (
         <Spinner />
       ) : filtered.length === 0 ? (
-        <EmptyState title="No findings match" description="Try relaxing the filters." />
+        <EmptyState
+          title={activeFilters ? "No findings match" : "No findings"}
+          description={activeFilters ? "Try relaxing the filters." : "This scan produced no findings."}
+        />
       ) : (
-        <Card>
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-2.5 text-xs text-slate-500">
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-2.5 text-xs text-slate-500">
             <span>
-              Showing {filtered.length} of {items.length} findings
+              Showing <span className="font-semibold text-slate-700">{filtered.length}</span> of {items.length} findings
             </span>
+            {activeFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSeverity("");
+                  setCategory("");
+                  setScanner("");
+                  setConfidence("");
+                  setFileType("");
+                  setSearch("");
+                }}
+                className="font-medium text-brand hover:text-brand-deep hover:underline"
+              >
+                Clear filters
+              </button>
+            ) : null}
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                <th className="px-5 py-2 font-medium">Severity</th>
-                <th className="px-5 py-2 font-medium">Finding</th>
-                <th className="px-5 py-2 font-medium">Scanner</th>
-                <th className="px-5 py-2 font-medium">Location</th>
-                <th className="px-5 py-2 font-medium">Confidence</th>
+              <tr className="border-b border-slate-200/80 text-left text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-2.5 font-semibold">Severity</th>
+                <th className="px-5 py-2.5 font-semibold">Finding</th>
+                <th className="px-5 py-2.5 font-semibold">Scanner</th>
+                <th className="px-5 py-2.5 font-semibold">Location</th>
+                <th className="px-5 py-2.5 font-semibold">Confidence</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((f) => {
                 const meta = fileById.get(f.file_id ?? "");
                 return (
-                  <tr key={f.id} className="border-b border-slate-200 last:border-0 hover:bg-slate-50">
+                  <tr key={f.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
                     <td className="px-5 py-3">
                       <SeverityPill severity={f.severity} />
                     </td>

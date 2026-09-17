@@ -40,6 +40,15 @@ function readinessRating(score: number): { label: string; tone: string } {
 export default function Dashboard() {
   const { data, isLoading, isError } = useStats();
 
+  // Findings live per-scan, so severity drilldowns open the most recent
+  // completed scan (falling back to the scan list when none exists).
+  const primaryScan =
+    data?.latest_scans.find((s) => s.status === "completed") ?? data?.latest_scans[0] ?? null;
+  const findingsLink = (severity?: string) =>
+    primaryScan
+      ? `/scans/${primaryScan.id}/findings${severity ? `?severity=${severity}` : ""}`
+      : "/scans";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
@@ -66,33 +75,37 @@ export default function Dashboard() {
               value={data.total_scans}
               hint={`${data.repositories_scanned} repositories`}
               tone="brand"
+              to="/scans"
               icon={<Icon path="M4 6h16M4 12h16M4 18h16" />}
             />
             <KpiTile
               label="Total findings"
               value={data.total_findings}
-              hint="across all scans"
+              hint="view all findings"
               tone="violet"
+              to={findingsLink()}
               icon={<Icon path="M12 9v4m0 4h.01M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />}
             />
             <KpiTile
               label="Critical"
               value={data.critical_issues}
-              hint={data.critical_issues > 0 ? "needs attention" : "all clear"}
+              hint={data.critical_issues > 0 ? "show critical issues" : "all clear"}
               tone={data.critical_issues > 0 ? "rose" : "emerald"}
+              to={findingsLink("critical")}
               icon={<Icon path="M12 9v4m0 4h.01M12 3a9 9 0 100 18 9 9 0 000-18z" />}
             />
             <KpiTile
               label="High"
               value={data.high_issues}
-              hint={data.high_issues > 0 ? "review soon" : "all clear"}
+              hint={data.high_issues > 0 ? "show high issues" : "all clear"}
               tone={data.high_issues > 0 ? "amber" : "emerald"}
+              to={findingsLink("high")}
               icon={<Icon path="M13 2L3 14h7l-1 8 10-12h-7l1-8z" />}
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <SeverityCard data={data} />
+            <SeverityCard data={data} findingsLink={findingsLink} />
             <CategoryCard counts={data.category_counts} />
             <TopRulesCard rules={data.top_rules} />
           </div>
@@ -245,16 +258,18 @@ function KpiTile({
   hint,
   tone,
   icon,
+  to,
 }: {
   label: string;
   value: ReactNode;
   hint: string;
   tone: keyof typeof TONE_STYLES;
   icon: ReactNode;
+  to?: string;
 }) {
   const style = TONE_STYLES[tone] ?? TONE_STYLES.brand;
-  return (
-    <div className="card card-hover animate-in p-4">
+  const body = (
+    <>
       <div className="flex items-start justify-between">
         <p className="section-title">{label}</p>
         <span className={`icon-tile ${style?.tile ?? ""}`}>{icon}</span>
@@ -262,12 +277,31 @@ function KpiTile({
       <p className={`mt-2 text-3xl font-extrabold tabular-nums tracking-tight ${style?.value ?? "text-slate-900"}`}>
         {value}
       </p>
-      <p className="mt-0.5 text-xs text-slate-500">{hint}</p>
-    </div>
+      <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+        {hint}
+        {to ? (
+          <span className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-brand">→</span>
+        ) : null}
+      </p>
+    </>
   );
+  if (to) {
+    return (
+      <Link to={to} className="card card-hover animate-in group block p-4">
+        {body}
+      </Link>
+    );
+  }
+  return <div className="card card-hover animate-in p-4">{body}</div>;
 }
 
-function SeverityCard({ data }: { data: StatsResponse }) {
+function SeverityCard({
+  data,
+  findingsLink,
+}: {
+  data: StatsResponse;
+  findingsLink: (severity?: string) => string;
+}) {
   const total = data.total_findings || 0;
   const segments = SEVERITY_ORDER.map((sev) => ({
     sev,
@@ -298,16 +332,21 @@ function SeverityCard({ data }: { data: StatsResponse }) {
             <span className="text-[9px] font-semibold uppercase tracking-widest text-slate-400">total</span>
           </div>
         </div>
-        <ul className="flex-1 space-y-1.5">
+        <ul className="flex-1 space-y-0.5">
           {SEVERITY_ORDER.map((sev) => {
             const count = data.severity_counts[sev] ?? 0;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
             return (
-              <li key={sev} className="flex items-center gap-2 text-xs">
-                <span className={`h-2.5 w-2.5 rounded-sm ${severityMeta(sev).dot}`} aria-hidden />
-                <span className="capitalize text-slate-600">{sev}</span>
-                <span className="ml-auto font-semibold tabular-nums text-slate-800">{count}</span>
-                <span className="w-9 text-right tabular-nums text-slate-400">{pct}%</span>
+              <li key={sev}>
+                <Link
+                  to={findingsLink(sev)}
+                  className="flex items-center gap-2 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-slate-50"
+                >
+                  <span className={`h-2.5 w-2.5 rounded-sm ${severityMeta(sev).dot}`} aria-hidden />
+                  <span className="capitalize text-slate-600">{sev}</span>
+                  <span className="ml-auto font-semibold tabular-nums text-slate-800">{count}</span>
+                  <span className="w-9 text-right tabular-nums text-slate-400">{pct}%</span>
+                </Link>
               </li>
             );
           })}
