@@ -29,12 +29,16 @@ from models.schemas import (
     RemediationResult,
     RemediationStatus,
 )
+from scanners.ansible import AnsibleScanner
 from scanners.cicd import CICDScanner
 from scanners.compose import DockerComposeScanner
+from scanners.config import ConfigScanner
 from scanners.docker import DockerScanner
 from scanners.finding import RuleFinding
+from scanners.helm import HelmScanner
 from scanners.kubernetes import KubernetesScanner
 from scanners.secrets import SecretScanner
+from scanners.shell import ShellScanner
 from scanners.terraform import TerraformScanner
 from services.remediation import (
     MANUAL_REQUIRED,
@@ -212,6 +216,14 @@ class RemediationService:
             return TerraformScanner(self._settings).analyze_files([(path, content)])
         if scanner == "secret-scanner":
             return SecretScanner(self._settings).scan_text(path, content)
+        if scanner == "shell-rules":
+            return ShellScanner(self._settings).analyze_text(content, path)
+        if scanner == "ansible-rules":
+            return AnsibleScanner(self._settings).analyze_text(content, path)
+        if scanner == "config-rules":
+            return ConfigScanner(self._settings).analyze_text(content, path)
+        if scanner == "helm-rules":
+            return HelmScanner(self._settings).analyze_text(content, path)
         if scanner in _CICD_TYPE_BY_SCANNER:
             detected = _CICD_TYPE_BY_SCANNER[scanner]
             return CICDScanner(self._settings).analyze_texts([(path, detected, content)])

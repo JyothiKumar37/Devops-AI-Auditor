@@ -21,10 +21,14 @@ from fastapi.testclient import TestClient
 
 from core.config import Settings
 from main import create_app
+from scanners.ansible import AnsibleScanner
 from scanners.compose import DockerComposeScanner
+from scanners.config import ConfigScanner
 from scanners.docker import DockerScanner
 from scanners.finding import RuleFinding
+from scanners.helm import HelmScanner
 from scanners.kubernetes import KubernetesScanner
+from scanners.shell import ShellScanner
 from scanners.terraform import TerraformScanner
 from services.remediation import MANUAL_REQUIRED, build_diff, changed_lines, propose_fix
 
@@ -47,6 +51,26 @@ def _k8s(text: str) -> list[RuleFinding]:
 
 def _tf(text: str) -> list[RuleFinding]:
     return TerraformScanner().analyze_files([("main.tf", text)])
+
+
+def _shell(text: str) -> list[RuleFinding]:
+    return ShellScanner().analyze_text(text, "deploy.sh")
+
+
+def _ansible(text: str) -> list[RuleFinding]:
+    return AnsibleScanner().analyze_text(text, "site.yml")
+
+
+def _config(text: str) -> list[RuleFinding]:
+    return ConfigScanner().analyze_text(text, "config/app.yaml")
+
+
+def _helm_values(text: str) -> list[RuleFinding]:
+    return HelmScanner().analyze_text(text, "demo/values.yaml")
+
+
+def _helm_chart(text: str) -> list[RuleFinding]:
+    return HelmScanner().analyze_text(text, "demo/Chart.yaml")
 
 
 def _find(findings: list[RuleFinding], rule_id: str) -> RuleFinding:
@@ -140,6 +164,22 @@ resource "aws_ebs_volume" "v" {
 }
 """
 
+# --- new scanner fix inputs (crafted so the target rule fires cleanly) ------
+
+SHELL_INSECURE = "#!/bin/bash\nset -euo pipefail\ncurl -k https://example.com\n"
+ANSIBLE_VALIDATE_CERTS = "get_url:\n  validate_certs: no\n"
+ANSIBLE_STATE_LATEST = "apt:\n  state: latest\n"
+CONFIG_DEBUG = "debug: true\n"
+CONFIG_TLS_VERIFY_FALSE = "ssl_verify: false\n"
+CONFIG_INSECURE_SKIP = "insecure_skip_verify: true\n"
+CONFIG_AUTH_OFF = "auth: false\n"
+HELM_CHART_V1 = "apiVersion: v1\nname: demo\nversion: 1.0.0\n"
+HELM_PRIVILEGED = "securityContext:\n  privileged: true\n"
+HELM_HOST_NS = "hostNetwork: true\n"
+HELM_RUN_AS_ROOT = "securityContext:\n  runAsNonRoot: false\n"
+HELM_RUN_AS_USER0 = "securityContext:\n  runAsUser: 0\n"
+HELM_APE = "securityContext:\n  allowPrivilegeEscalation: true\n"
+
 RESOLVE_CASES = [
     ("DCK003", DOCKER_USER_ROOT, _docker),
     ("DCK008", DOCKER_PIP, _docker),
@@ -151,6 +191,19 @@ RESOLVE_CASES = [
     ("TF004", TF_PUBLIC_RDS, _tf),
     ("TF006", TF_UNENCRYPTED_RDS, _tf),
     ("TF006", TF_UNENCRYPTED_EBS, _tf),
+    ("SH007", SHELL_INSECURE, _shell),
+    ("ANS002", ANSIBLE_VALIDATE_CERTS, _ansible),
+    ("ANS006", ANSIBLE_STATE_LATEST, _ansible),
+    ("CFG001", CONFIG_DEBUG, _config),
+    ("CFG002", CONFIG_TLS_VERIFY_FALSE, _config),
+    ("CFG002", CONFIG_INSECURE_SKIP, _config),
+    ("CFG005", CONFIG_AUTH_OFF, _config),
+    ("HELM001", HELM_CHART_V1, _helm_chart),
+    ("HELM011", HELM_PRIVILEGED, _helm_values),
+    ("HELM012", HELM_HOST_NS, _helm_values),
+    ("HELM013", HELM_RUN_AS_ROOT, _helm_values),
+    ("HELM013", HELM_RUN_AS_USER0, _helm_values),
+    ("HELM014", HELM_APE, _helm_values),
 ]
 
 
@@ -298,6 +351,30 @@ def test_workflow_propose_then_apply_resolves(client: TestClient) -> None:
     ).json()["content"]
     assert "USER 1000" in content_after
     assert "USER root" not in content_after
+
+    remaining = client.get(f"/api/v1/scans/{scan_id}/findings").json()["items"]
+    assert not any(f["id"] == fid for f in remaining)
+
+
+def test_workflow_config_fix_resolves(client: TestClient) -> None:
+    # A new-scanner (config) finding must be fixable end to end: propose a diff,
+    # apply it to the stored copy, and verify the re-scan clears it.
+    scan_id = _upload(client, {"config/app.yaml": b"debug: true\n"})
+    finding = _finding_by_rule(client, scan_id, "CFG001")
+    fid = finding["id"]
+
+    proposal = client.post(
+        f"/api/v1/scans/{scan_id}/findings/{fid}/remediation"
+    ).json()
+    assert proposal["status"] == "proposed"
+    assert "debug: true" in proposal["before"]
+    assert "debug: false" in proposal["after"]
+
+    applied = client.post(
+        f"/api/v1/scans/{scan_id}/findings/{fid}/remediation/apply"
+    ).json()
+    assert applied["applied"] is True
+    assert applied["resolved"] is True
 
     remaining = client.get(f"/api/v1/scans/{scan_id}/findings").json()["items"]
     assert not any(f["id"] == fid for f in remaining)

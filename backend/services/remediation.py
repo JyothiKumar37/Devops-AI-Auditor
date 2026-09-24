@@ -37,6 +37,41 @@ def _sub_once(pattern: str, repl: str, content: str, flags: int = 0) -> str | No
     return new if count else None
 
 
+def _sub_line(pattern: str, repl: str, flags: int = 0) -> Callable[[str], str | None]:
+    """Build a single-line transform that applies one regex substitution."""
+
+    def transform(s: str) -> str | None:
+        new, count = re.subn(pattern, repl, s, count=1, flags=flags)
+        return new if count and new != s else None
+
+    return transform
+
+
+# Boolean-ish value tokens used by config/YAML flips.
+_TRUTHY_TOKENS = frozenset({"true", "1", "yes", "on", "enabled"})
+_FALSY_BOOL_TOKENS = frozenset({"false", "0", "no", "off", "disabled"})
+# key: value | key = value | "key": value, capturing the value token to flip.
+_KV_VALUE = re.compile(
+    r'^(?P<pre>\s*["\']?[\w.\-]+["\']?\s*[:=]\s*["\']?)(?P<val>[A-Za-z0-9]+)(?P<post>.*)$'
+)
+
+
+def _flip_value(from_tokens: frozenset[str], target: str) -> Callable[[str], str | None]:
+    """Build a transform that flips a boolean-ish value token to `target`.
+
+    Only rewrites when the current value is one of `from_tokens`, so it never
+    guesses on an unexpected value (e.g. 'none' is left for manual handling).
+    """
+
+    def transform(s: str) -> str | None:
+        match = _KV_VALUE.match(s)
+        if not match or match.group("val").lower() not in from_tokens:
+            return None
+        return match.group("pre") + target + match.group("post")
+
+    return transform
+
+
 def _replace_line(
     content: str, line: int | None, transform: Callable[[str], str | None]
 ) -> str | None:
@@ -119,6 +154,103 @@ def _apt_no_recommends(content: str, line: int | None, _ev: str | None) -> str |
     return _replace_line(content, line, t)
 
 
+# --- shell fixers -----------------------------------------------------------
+
+
+def _remove_insecure_download_flags(
+    content: str, line: int | None, _ev: str | None
+) -> str | None:
+    def t(s: str) -> str | None:
+        new = re.sub(r"\s(?:-k|--insecure)\b", "", s)
+        new = re.sub(r"\s--no-check-certificate\b", "", new)
+        return new if new != s else None
+
+    return _replace_line(content, line, t)
+
+
+# --- ansible fixers ---------------------------------------------------------
+
+
+def _ansible_validate_certs_true(content: str, line: int | None, _ev: str | None) -> str | None:
+    return _replace_line(
+        content, line, _sub_line(r"(validate_certs\s*:\s*)(?:no|false)\b", r"\g<1>true", re.I)
+    )
+
+
+def _ansible_state_present(content: str, line: int | None, _ev: str | None) -> str | None:
+    return _replace_line(
+        content, line, _sub_line(r"(state\s*:\s*['\"]?)latest\b", r"\g<1>present", re.I)
+    )
+
+
+# --- generic config fixers --------------------------------------------------
+
+
+def _config_debug_false(content: str, line: int | None, _ev: str | None) -> str | None:
+    return _replace_line(content, line, _flip_value(_TRUTHY_TOKENS, "false"))
+
+
+def _config_auth_true(content: str, line: int | None, _ev: str | None) -> str | None:
+    return _replace_line(content, line, _flip_value(_FALSY_BOOL_TOKENS, "true"))
+
+
+# Keys whose secure value is truthy / falsy respectively (mirrors config rules).
+_TLS_SECURE_TRUE_KEYS = frozenset(
+    {
+        "verify", "ssl_verify", "verify_ssl", "tls_verify", "sslverify",
+        "rejectunauthorized", "validate_certs", "check_certificate",
+        "checkcertificate", "ssl_verifypeer",
+    }
+)
+_TLS_SECURE_FALSE_KEYS = frozenset(
+    {
+        "insecure_skip_verify", "insecure", "skip_tls_verify", "tls_skip_verify",
+        "allow_insecure", "disable_ssl_verification", "sslinsecure",
+    }
+)
+
+
+def _config_tls_verify(content: str, line: int | None, _ev: str | None) -> str | None:
+    def t(s: str) -> str | None:
+        key_match = re.match(r'^\s*["\']?(?P<key>[\w.\-]+)["\']?\s*[:=]', s)
+        if not key_match:
+            return None
+        key = key_match.group("key").lower()
+        if key in _TLS_SECURE_TRUE_KEYS:
+            return _flip_value(_FALSY_BOOL_TOKENS, "true")(s)
+        if key in _TLS_SECURE_FALSE_KEYS:
+            return _flip_value(_TRUTHY_TOKENS, "false")(s)
+        if key == "node_tls_reject_unauthorized":
+            return _sub_line(r"([:=]\s*)0\b", r"\g<1>1")(s)
+        return None
+
+    return _replace_line(content, line, t)
+
+
+# --- helm fixers ------------------------------------------------------------
+
+
+def _helm_apiversion_v2(content: str, _line: int | None, _ev: str | None) -> str | None:
+    return _sub_once(r"(?m)^(apiVersion\s*:\s*)v1\s*$", r"\g<1>v2", content)
+
+
+def _helm_host_ns_false(content: str, line: int | None, _ev: str | None) -> str | None:
+    return _replace_line(
+        content,
+        line,
+        _sub_line(r"((?:hostNetwork|hostPID|hostIPC)\s*:\s*)true\b", r"\g<1>false"),
+    )
+
+
+def _helm_run_as_nonroot(content: str, line: int | None, _ev: str | None) -> str | None:
+    def t(s: str) -> str | None:
+        new = re.sub(r"(runAsNonRoot\s*:\s*)false\b", r"\g<1>true", s, count=1)
+        new = re.sub(r"(runAsUser\s*:\s*)0\b", r"\g<1>1000", new, count=1)
+        return new if new != s else None
+
+    return _replace_line(content, line, t)
+
+
 @dataclass(frozen=True, slots=True)
 class _Spec:
     fixer: Fixer
@@ -170,6 +302,53 @@ FIXERS: dict[str, _Spec] = {
     "TF006": _Spec(
         _tf_encrypt_true, "Enable encryption at rest",
         "Set storage_encrypted = true.",
+    ),
+    # Shell
+    "SH007": _Spec(
+        _remove_insecure_download_flags, "Remove the TLS-bypass flag",
+        "Drop -k/--insecure/--no-check-certificate so the download verifies TLS.",
+    ),
+    # Ansible
+    "ANS002": _Spec(
+        _ansible_validate_certs_true, "Enable certificate verification",
+        "Set validate_certs: true.",
+    ),
+    "ANS006": _Spec(
+        _ansible_state_present, "Pin package state to 'present'",
+        "Replace 'state: latest' with 'state: present' for reproducible runs.",
+    ),
+    # Generic configuration
+    "CFG001": _Spec(
+        _config_debug_false, "Disable debug mode", "Set the debug flag to false.",
+    ),
+    "CFG002": _Spec(
+        _config_tls_verify, "Re-enable TLS verification",
+        "Set the verification flag back to its secure value.",
+    ),
+    "CFG005": _Spec(
+        _config_auth_true, "Enable authentication",
+        "Turn authentication back on (set it to true).",
+    ),
+    # Helm
+    "HELM001": _Spec(
+        _helm_apiversion_v2, "Upgrade chart to apiVersion v2",
+        "Set 'apiVersion: v2' for Helm 3.",
+    ),
+    "HELM011": _Spec(
+        _privileged_false, "Disable privileged container",
+        "Set securityContext.privileged: false.",
+    ),
+    "HELM012": _Spec(
+        _helm_host_ns_false, "Disable host namespace sharing",
+        "Set hostNetwork/hostPID/hostIPC to false.",
+    ),
+    "HELM013": _Spec(
+        _helm_run_as_nonroot, "Run as a non-root user",
+        "Set runAsNonRoot: true / a non-root runAsUser.",
+    ),
+    "HELM014": _Spec(
+        _ape_false, "Disable privilege escalation",
+        "Set allowPrivilegeEscalation: false.",
     ),
 }
 # aws_ebs_volume uses a bare `encrypted` attribute; handle that TF006 variant too.
