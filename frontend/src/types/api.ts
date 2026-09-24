@@ -46,6 +46,48 @@ export interface ScanListResponse {
   total: number;
 }
 
+export interface GitScanRequest {
+  repository_url: string;
+  ref?: string | null;
+}
+
+export interface ScanDiffFinding {
+  rule_id: string;
+  scanner: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  recommendation: string;
+}
+
+export interface ScanDiffSummary {
+  new: number;
+  fixed: number;
+  unchanged: number;
+  base_total: number;
+  head_total: number;
+}
+
+export interface ScanDiffResponse {
+  base_scan_id: string | null;
+  head_scan_id: string;
+  repository_name: string;
+  base_created_at: string | null;
+  head_created_at: string;
+  base_readiness: number | null;
+  head_readiness: number;
+  readiness_delta: number | null;
+  summary: ScanDiffSummary;
+  new_severity_counts: Record<string, number>;
+  fixed_severity_counts: Record<string, number>;
+  new_findings: ScanDiffFinding[];
+  fixed_findings: ScanDiffFinding[];
+  unchanged_findings: ScanDiffFinding[];
+}
+
 export interface RepositoryFile {
   id: string;
   scan_id: string;

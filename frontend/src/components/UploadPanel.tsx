@@ -1,14 +1,16 @@
 import { useCallback, useRef, useState } from "react";
 
 import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_MB, formatBytes } from "@/lib/format";
-import { useUploadScan } from "@/hooks/useScans";
+import { useIngestGitScan, useUploadScan } from "@/hooks/useScans";
 import type { ScanSummary } from "@/types/api";
 
 interface UploadPanelProps {
   onUploaded: (scan: ScanSummary) => void;
 }
 
-type Mode = "zip" | "folder";
+type Mode = "zip" | "folder" | "git";
+
+const MODE_LABELS: Record<Mode, string> = { zip: "ZIP file", folder: "Folder", git: "Git URL" };
 
 const MAX_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 
@@ -51,12 +53,15 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
   const [dragging, setDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
+  const [gitUrl, setGitUrl] = useState("");
+  const [gitRef, setGitRef] = useState("");
 
   const zipInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
 
   const upload = useUploadScan((fraction) => setProgress(fraction));
-  const busy = upload.isPending || phase === "packaging";
+  const gitScan = useIngestGitScan();
+  const busy = upload.isPending || phase === "packaging" || gitScan.isPending;
 
   const startUpload = useCallback(
     (file: File, displayName: string) => {
@@ -149,6 +154,23 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     [startUpload],
   );
 
+  const submitGit = useCallback(() => {
+    setLocalError(null);
+    const url = gitUrl.trim();
+    if (!url) {
+      setLocalError("Enter a repository URL.");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      setLocalError("Only http(s) repository URLs are supported.");
+      return;
+    }
+    gitScan.mutate(
+      { repository_url: url, ref: gitRef.trim() || null },
+      { onSuccess: (scan) => onUploaded(scan) },
+    );
+  }, [gitUrl, gitRef, gitScan, onUploaded]);
+
   const onDrop = useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -160,7 +182,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
     [mode, handleZip],
   );
 
-  const serverError = upload.isError ? (upload.error as Error).message : null;
+  const serverError = upload.isError
+    ? (upload.error as Error).message
+    : gitScan.isError
+      ? (gitScan.error as Error).message
+      : null;
   const activeFraction = phase === "packaging" ? packFraction : progress;
   const phaseLabel =
     phase === "packaging"
@@ -174,7 +200,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="section-title">Upload repository</h2>
         <div className="flex rounded-lg border border-slate-200 p-0.5 text-xs">
-          {(["zip", "folder"] as Mode[]).map((m) => (
+          {(["zip", "folder", "git"] as Mode[]).map((m) => (
             <button
               key={m}
               type="button"
@@ -182,11 +208,11 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
                 setMode(m);
                 setLocalError(null);
               }}
-              className={`rounded-md px-3 py-1 font-medium capitalize transition ${
+              className={`rounded-md px-3 py-1 font-medium transition ${
                 mode === m ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              {m === "zip" ? "ZIP file" : "Folder"}
+              {MODE_LABELS[m]}
             </button>
           ))}
         </div>
@@ -220,6 +246,60 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
         }}
       />
 
+      {mode === "git" ? (
+        <div className="rounded-xl border border-slate-200 p-5">
+          <label className="block text-sm font-medium text-slate-800" htmlFor="git-url">
+            Repository URL
+          </label>
+          <input
+            id="git-url"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="https://github.com/owner/repo.git"
+            value={gitUrl}
+            onChange={(e) => setGitUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitGit();
+            }}
+            disabled={busy}
+            className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+          />
+
+          <label className="mt-4 block text-sm font-medium text-slate-800" htmlFor="git-ref">
+            Branch or tag <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <input
+            id="git-ref"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="main"
+            value={gitRef}
+            onChange={(e) => setGitRef(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitGit();
+            }}
+            disabled={busy}
+            className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+          />
+
+          <button
+            type="button"
+            onClick={submitGit}
+            disabled={busy}
+            className="mt-4 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {gitScan.isPending ? "Cloning & scanning…" : "Clone & scan"}
+          </button>
+
+          <p className="mt-3 text-xs text-slate-500">
+            Public http(s) repositories only. The repo is shallow-cloned into an isolated
+            workspace, analysed read-only, then discarded.
+          </p>
+        </div>
+      ) : (
       <div
         role="button"
         tabIndex={0}
@@ -280,6 +360,7 @@ export function UploadPanel({ onUploaded }: UploadPanelProps) {
           </>
         )}
       </div>
+      )}
 
       {(busy || activeFraction > 0) && label ? (
         <div className="mt-4">

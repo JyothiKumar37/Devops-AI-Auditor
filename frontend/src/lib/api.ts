@@ -8,11 +8,13 @@ import type {
   DiscoveryResponse,
   FindingFilters,
   FindingsResponse,
+  GitScanRequest,
   HealthResponse,
   RemediationProposal,
   RemediationResult,
   ReportModel,
   RepositoryFileContent,
+  ScanDiffResponse,
   ScanFilesResponse,
   ScanListResponse,
   ScanSummary,
@@ -51,6 +53,23 @@ async function post<T>(path: string): Promise<T> {
   const response = await fetch(path, {
     method: "POST",
     headers: { Accept: "application/json" },
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(
+      body?.error?.message ?? `Request to ${path} failed`,
+      response.status,
+      body?.error?.code,
+    );
+  }
+  return (await response.json()) as T;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
@@ -120,10 +139,16 @@ export const api = {
   getStats: () => request<StatsResponse>(`${API_V1}/stats`),
   /** List scans, most recent first. */
   listScans: () => request<ScanListResponse>(`${API_V1}/scans`),
+  /** Clone and ingest a repository directly from a git URL. */
+  ingestGit: (payload: GitScanRequest) =>
+    postJson<ScanSummary>(`${API_V1}/scans/git`, payload),
   /** Fetch a single scan's summary. */
   getScan: (id: string) => request<ScanSummary>(`${API_V1}/scans/${id}`),
   /** Fetch the grouped discovery output for a scan. */
   getDiscovery: (id: string) => request<DiscoveryResponse>(`${API_V1}/scans/${id}/discovery`),
+  /** Diff a scan's findings against a previous (or explicit) base scan. */
+  getScanDiff: (id: string, base?: string) =>
+    request<ScanDiffResponse>(`${API_V1}/scans/${id}/diff${query({ base })}`),
   /** List repository files for a scan. */
   getScanFiles: (id: string) =>
     request<ScanFilesResponse>(`${API_V1}/scans/${id}/files?limit=2000`),

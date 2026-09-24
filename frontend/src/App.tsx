@@ -8,6 +8,7 @@ import NewScan from "@/pages/NewScan";
 import Readiness from "@/pages/Readiness";
 import ReportView from "@/pages/ReportView";
 import RepositoryFiles from "@/pages/RepositoryFiles";
+import ScanDiff from "@/pages/ScanDiff";
 import ScanHistory from "@/pages/ScanHistory";
 import ScanLayout from "@/pages/ScanLayout";
 import ScanOverview from "@/pages/ScanOverview";
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="findings/:findingId" element={<FindingDetails />} />
           <Route path="files" element={<RepositoryFiles />} />
           <Route path="readiness" element={<Readiness />} />
+          <Route path="diff" element={<ScanDiff />} />
           <Route path="report" element={<ReportView />} />
         </Route>
         <Route path="/settings" element={<Settings />} />

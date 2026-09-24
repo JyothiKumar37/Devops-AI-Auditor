@@ -13,6 +13,7 @@ repository code is ever executed.
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -28,17 +29,22 @@ from core.logging import get_logger
 from models.enums import ScanStatus, Severity, SourceType
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
+from scanners.ansible import AnsibleScanner
 from scanners.cicd import CICDScanner
 from scanners.compose import DockerComposeScanner
+from scanners.config import ConfigScanner
 from scanners.correlation import CorrelationExtractor
 from scanners.docker import DockerScanner
 from scanners.finding import RuleFinding
+from scanners.helm import HelmScanner
 from scanners.kubernetes import KubernetesScanner
 from scanners.low_signal import downrank_if_low_signal
 from scanners.secrets import SecretScanner
+from scanners.shell import ShellScanner
 from scanners.terraform import TerraformScanner
 from services.ingestion.archive import ArchiveValidationError, ZipArchiveExtractor
-from services.ingestion.workspace import WorkspaceManager
+from services.ingestion.git import GitCloneError, GitRepositoryCloner
+from services.ingestion.workspace import Workspace, WorkspaceManager
 
 logger = get_logger(__name__)
 
@@ -61,6 +67,16 @@ class InvalidArchiveError(AppError):
     code = "invalid_archive"
 
 
+class InvalidGitRepoError(AppError):
+    status_code = 422
+    code = "invalid_repository"
+
+
+class GitIngestionDisabledError(AppError):
+    status_code = 403
+    code = "git_ingestion_disabled"
+
+
 def _utcnow() -> datetime:
     return datetime.now(UTC)
 
@@ -73,6 +89,7 @@ class ScanService:
         self._settings = settings
         self._workspaces = WorkspaceManager(settings)
         self._extractor = ZipArchiveExtractor(settings)
+        self._cloner = GitRepositoryCloner(settings)
         self._discovery = RepositoryDiscoveryAgent()
 
     # -- queries -------------------------------------------------------------
@@ -319,6 +336,184 @@ class ScanService:
             "recommendation": finding.recommendation or "",
         }
 
+    # -- diffing -------------------------------------------------------------
+
+    async def get_diff(
+        self, head_id: uuid.UUID, base_id: uuid.UUID | None = None
+    ) -> dict[str, Any]:
+        """Compare a scan's findings against a previous (or explicit) base scan.
+
+        When `base_id` is omitted the most recent completed scan of the same
+        repository (created before `head`) is used. Findings are matched by a
+        line-independent fingerprint and partitioned into new / fixed / unchanged,
+        and the deterministic readiness score is reported for both sides.
+        """
+        head = await self._session.get(Scan, head_id)
+        if head is None:
+            raise NotFoundError(f"Scan {head_id} not found.")
+
+        if base_id is not None:
+            base = await self._session.get(Scan, base_id)
+            if base is None:
+                raise NotFoundError(f"Base scan {base_id} not found.")
+        else:
+            base = await self._find_previous_scan(head)
+
+        head_items = await self._findings_with_paths(head_id)
+        base_items = await self._findings_with_paths(base.id) if base else []
+
+        head_groups = self._group_by_fingerprint(head_items)
+        base_groups = self._group_by_fingerprint(base_items)
+
+        new_items: list[tuple[Finding, str | None]] = []
+        fixed_items: list[tuple[Finding, str | None]] = []
+        unchanged_items: list[tuple[Finding, str | None]] = []
+        for fingerprint in set(base_groups) | set(head_groups):
+            base_group = base_groups.get(fingerprint, [])
+            head_group = head_groups.get(fingerprint, [])
+            common = min(len(base_group), len(head_group))
+            unchanged_items.extend(head_group[:common])
+            if len(head_group) > len(base_group):
+                new_items.extend(head_group[common:])
+            elif len(base_group) > len(head_group):
+                fixed_items.extend(base_group[common:])
+
+        new_items = self._sort_diff(new_items)
+        fixed_items = self._sort_diff(fixed_items)
+        unchanged_items = self._sort_diff(unchanged_items)
+
+        head_readiness = await self._readiness_score(head_id)
+        base_readiness = await self._readiness_score(base.id) if base else None
+        readiness_delta = (
+            head_readiness - base_readiness if base_readiness is not None else None
+        )
+
+        return {
+            "base_scan_id": base.id if base else None,
+            "head_scan_id": head.id,
+            "repository_name": head.repository_name,
+            "base_created_at": base.created_at if base else None,
+            "head_created_at": head.created_at,
+            "base_readiness": base_readiness,
+            "head_readiness": head_readiness,
+            "readiness_delta": readiness_delta,
+            "summary": {
+                "new": len(new_items),
+                "fixed": len(fixed_items),
+                "unchanged": len(unchanged_items),
+                "base_total": len(base_items),
+                "head_total": len(head_items),
+            },
+            "new_severity_counts": self._severity_counts(new_items),
+            "fixed_severity_counts": self._severity_counts(fixed_items),
+            "new_findings": [self._diff_finding(item) for item in new_items],
+            "fixed_findings": [self._diff_finding(item) for item in fixed_items],
+            "unchanged_findings": [self._diff_finding(item) for item in unchanged_items],
+        }
+
+    async def _find_previous_scan(self, head: Scan) -> Scan | None:
+        """The most recent completed scan of the same repo before `head`."""
+        stmt = (
+            select(Scan)
+            .where(
+                Scan.repository_name == head.repository_name,
+                Scan.id != head.id,
+                Scan.status == ScanStatus.COMPLETED,
+                Scan.created_at < head.created_at,
+            )
+            .order_by(Scan.created_at.desc())
+            .limit(1)
+        )
+        return await self._session.scalar(stmt)
+
+    async def _findings_with_paths(
+        self, scan_id: uuid.UUID
+    ) -> list[tuple[Finding, str | None]]:
+        """Load a scan's findings paired with their (resolved) repository path."""
+        stmt = (
+            select(Finding, RepositoryFile.path)
+            .outerjoin(RepositoryFile, Finding.file_id == RepositoryFile.id)
+            .where(Finding.scan_id == scan_id)
+        )
+        rows = (await self._session.execute(stmt)).all()
+        return [(row[0], row[1]) for row in rows]
+
+    async def _readiness_score(self, scan_id: uuid.UUID) -> int:
+        """Deterministic production-readiness score (0-100) for a scan."""
+        from agents.reasoning.readiness import assess
+
+        findings = [
+            self._finding_dict(f)
+            for f in (
+                await self._session.scalars(
+                    select(Finding).where(Finding.scan_id == scan_id)
+                )
+            ).all()
+        ]
+        files = [
+            {"file_type": ft}
+            for (ft,) in (
+                await self._session.execute(
+                    select(RepositoryFile.file_type).where(
+                        RepositoryFile.scan_id == scan_id
+                    )
+                )
+            ).all()
+        ]
+        return assess(findings, files).score
+
+    @staticmethod
+    def _fingerprint(item: tuple[Finding, str | None]) -> tuple[str, str, str]:
+        """Line-independent identity for matching a finding across scans."""
+        finding, path = item
+        return (finding.rule_id, path or "", (finding.evidence or "").strip())
+
+    def _group_by_fingerprint(
+        self, items: list[tuple[Finding, str | None]]
+    ) -> dict[tuple[str, str, str], list[tuple[Finding, str | None]]]:
+        groups: dict[tuple[str, str, str], list[tuple[Finding, str | None]]] = defaultdict(
+            list
+        )
+        for item in items:
+            groups[self._fingerprint(item)].append(item)
+        return groups
+
+    @staticmethod
+    def _sort_diff(
+        items: list[tuple[Finding, str | None]],
+    ) -> list[tuple[Finding, str | None]]:
+        return sorted(
+            items,
+            key=lambda it: (
+                -Severity(it[0].severity).rank,
+                it[0].rule_id,
+                it[1] or "",
+                it[0].line_number or 0,
+            ),
+        )
+
+    @staticmethod
+    def _severity_counts(items: list[tuple[Finding, str | None]]) -> dict[str, int]:
+        counts = {s.value: 0 for s in Severity}
+        for finding, _ in items:
+            counts[str(finding.severity)] = counts.get(str(finding.severity), 0) + 1
+        return counts
+
+    @staticmethod
+    def _diff_finding(item: tuple[Finding, str | None]) -> dict[str, Any]:
+        finding, path = item
+        return {
+            "rule_id": finding.rule_id,
+            "scanner": finding.scanner,
+            "category": str(finding.category),
+            "severity": str(finding.severity),
+            "confidence": str(finding.confidence),
+            "title": finding.title,
+            "file": path,
+            "line": finding.line_number,
+            "recommendation": finding.recommendation or "",
+        }
+
     # -- scanning ------------------------------------------------------------
 
     def _run_scanners(
@@ -366,6 +561,33 @@ class ScanService:
                 file_id = file_id_by_path.get(rule_finding.file_path)
                 findings.append(self._to_finding(scan_id, file_id, rule_finding))
 
+        # Helm chart files (Chart.yaml / values.yaml / templates) analysed individually.
+        helm_files = [f for f in discovered_files if f.category == FileCategory.HELM]
+        if helm_files:
+            helm_scanner = HelmScanner(self._settings)
+            for discovered in helm_files:
+                file_id = file_id_by_path.get(discovered.path)
+                for rule_finding in helm_scanner.analyze_file(repo_root, discovered.path):
+                    findings.append(self._to_finding(scan_id, file_id, rule_finding))
+
+        # Ansible playbooks/roles/vars are analysed individually.
+        ansible_files = [f for f in discovered_files if f.category == FileCategory.ANSIBLE]
+        if ansible_files:
+            ansible_scanner = AnsibleScanner(self._settings)
+            for discovered in ansible_files:
+                file_id = file_id_by_path.get(discovered.path)
+                for rule_finding in ansible_scanner.analyze_file(repo_root, discovered.path):
+                    findings.append(self._to_finding(scan_id, file_id, rule_finding))
+
+        # Shell scripts are analysed individually (line/regex based rules).
+        shell_files = [f for f in discovered_files if f.category == FileCategory.SHELL]
+        if shell_files:
+            shell_scanner = ShellScanner(self._settings)
+            for discovered in shell_files:
+                file_id = file_id_by_path.get(discovered.path)
+                for rule_finding in shell_scanner.analyze_file(repo_root, discovered.path):
+                    findings.append(self._to_finding(scan_id, file_id, rule_finding))
+
         # CI/CD files dispatched by platform (GitHub Actions / GitLab CI / Jenkins).
         cicd_files = [f for f in discovered_files if f.category == FileCategory.CICD]
         if cicd_files:
@@ -374,6 +596,17 @@ class ScanService:
             for rule_finding in cicd_scanner.analyze_repo(repo_root, entries):
                 file_id = file_id_by_path.get(rule_finding.file_path)
                 findings.append(self._to_finding(scan_id, file_id, rule_finding))
+
+        # Generic configuration files (YAML/JSON/TOML/ini/env) analysed individually.
+        config_files = [
+            f for f in discovered_files if f.category == FileCategory.CONFIGURATION
+        ]
+        if config_files:
+            config_scanner = ConfigScanner(self._settings)
+            for discovered in config_files:
+                file_id = file_id_by_path.get(discovered.path)
+                for rule_finding in config_scanner.analyze_file(repo_root, discovered.path):
+                    findings.append(self._to_finding(scan_id, file_id, rule_finding))
 
         # Secret scanning runs over every file (secrets can appear anywhere).
         secret_scanner = SecretScanner(self._settings)
@@ -461,49 +694,8 @@ class ScanService:
             await self._session.commit()
 
             self._extractor.extract(workspace.upload_path, workspace.repo_path)
-            discovery = self._discovery.discover(workspace.repo_path)
-
-            file_id_by_path: dict[str, uuid.UUID] = {}
-            repo_files: list[RepositoryFile] = []
-            for item in discovery.files:
-                file_id = uuid.uuid4()
-                file_id_by_path[item.path] = file_id
-                repo_files.append(
-                    RepositoryFile(
-                        id=file_id,
-                        scan_id=scan.id,
-                        path=item.path,
-                        file_type=item.detected_type,
-                        size=item.size,
-                        checksum=item.checksum,
-                        content=self._read_file_content(workspace.repo_path / item.path),
-                    )
-                )
-            self._session.add_all(repo_files)
-
-            # Run deterministic scanners while the workspace still exists.
-            findings = self._run_scanners(
-                workspace.repo_path, discovery.files, scan.id, file_id_by_path
-            )
-            self._session.add_all(findings)
-
-            # Extract the cross-stack entity index for later correlation.
-            scan.correlation_index = CorrelationExtractor().extract(
-                workspace.repo_path,
-                [(f.path, f.detected_type) for f in discovery.files],
-            )
-
-            scan.status = ScanStatus.COMPLETED
-            scan.completed_at = _utcnow()
-            await self._session.commit()
-
-            logger.info(
-                "scan_completed",
-                scan_id=str(scan_id),
-                files=len(discovery.files),
-                findings=len(findings),
-            )
-            return scan, len(discovery.files)
+            file_count = await self._process_repo(scan, scan_id, workspace)
+            return scan, file_count
         except AppError as exc:
             await self._fail_scan(scan_id, exc.message)
             raise
@@ -517,6 +709,117 @@ class ScanService:
         finally:
             # Always remove the extracted repository and raw upload.
             self._workspaces.destroy(workspace)
+
+    async def ingest_git_repo(
+        self,
+        *,
+        repository_url: str,
+        ref: str | None = None,
+    ) -> tuple[Scan, int]:
+        """Clone a repository from a URL and run the full ingestion pipeline.
+
+        Mirrors `ingest_zip_upload`, differing only in how the repository is
+        materialised into the isolated workspace: instead of extracting an
+        uploaded archive, a hardened shallow git clone populates the workspace.
+        The workspace is always removed afterwards and repository code is never
+        executed.
+        """
+        if not self._settings.git_ingestion_enabled:
+            raise GitIngestionDisabledError("Git repository ingestion is disabled.")
+
+        # Validate the URL up front so a bad request never creates a scan row.
+        try:
+            self._cloner.validate_url(repository_url)
+        except GitCloneError as exc:
+            raise InvalidGitRepoError(str(exc)) from exc
+
+        scan = Scan(
+            id=uuid.uuid4(),
+            repository_name=self._cloner.repo_name_from_url(repository_url),
+            source_type=SourceType.GIT,
+            status=ScanStatus.PENDING,
+        )
+        self._session.add(scan)
+        await self._session.commit()
+
+        scan_id = scan.id
+        workspace = self._workspaces.create(scan_id)
+        try:
+            scan.status = ScanStatus.RUNNING
+            scan.started_at = _utcnow()
+            await self._session.commit()
+
+            self._cloner.clone(repository_url, ref, workspace.repo_path)
+            file_count = await self._process_repo(scan, scan_id, workspace)
+
+            logger.info("git_scan_ingested", scan_id=str(scan_id), url_host_only=True)
+            return scan, file_count
+        except AppError as exc:
+            await self._fail_scan(scan_id, exc.message)
+            raise
+        except GitCloneError as exc:
+            await self._fail_scan(scan_id, str(exc))
+            raise InvalidGitRepoError(str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001 - record unexpected failures too
+            logger.error("scan_failed", scan_id=str(scan_id), error=str(exc))
+            await self._fail_scan(scan_id, "Internal error during ingestion.")
+            raise
+        finally:
+            # Always remove the cloned repository and its workspace.
+            self._workspaces.destroy(workspace)
+
+    async def _process_repo(
+        self, scan: Scan, scan_id: uuid.UUID, workspace: Workspace
+    ) -> int:
+        """Discover, index, scan and finalise a materialised repository.
+
+        Shared by ZIP and git ingestion: by the time this runs the repository
+        contents already exist under ``workspace.repo_path``. Returns the number
+        of discovered files.
+        """
+        discovery = self._discovery.discover(workspace.repo_path)
+
+        file_id_by_path: dict[str, uuid.UUID] = {}
+        repo_files: list[RepositoryFile] = []
+        for item in discovery.files:
+            file_id = uuid.uuid4()
+            file_id_by_path[item.path] = file_id
+            repo_files.append(
+                RepositoryFile(
+                    id=file_id,
+                    scan_id=scan.id,
+                    path=item.path,
+                    file_type=item.detected_type,
+                    size=item.size,
+                    checksum=item.checksum,
+                    content=self._read_file_content(workspace.repo_path / item.path),
+                )
+            )
+        self._session.add_all(repo_files)
+
+        # Run deterministic scanners while the workspace still exists.
+        findings = self._run_scanners(
+            workspace.repo_path, discovery.files, scan.id, file_id_by_path
+        )
+        self._session.add_all(findings)
+
+        # Extract the cross-stack entity index for later correlation.
+        scan.correlation_index = CorrelationExtractor().extract(
+            workspace.repo_path,
+            [(f.path, f.detected_type) for f in discovery.files],
+        )
+
+        scan.status = ScanStatus.COMPLETED
+        scan.completed_at = _utcnow()
+        await self._session.commit()
+
+        logger.info(
+            "scan_completed",
+            scan_id=str(scan_id),
+            files=len(discovery.files),
+            findings=len(findings),
+        )
+        return len(discovery.files)
 
     # -- internals -----------------------------------------------------------
 

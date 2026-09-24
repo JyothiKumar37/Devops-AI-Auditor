@@ -90,6 +90,18 @@ class Settings(BaseSettings):
     # dedicated subdirectory under the system temp directory is used.
     workspace_root: str = ""
 
+    # ---- Ingestion / git ----
+    # Enable cloning repositories directly from a URL (POST /scans/git).
+    git_ingestion_enabled: bool = True
+    # Maximum seconds a clone may run before it is aborted.
+    git_clone_timeout: int = 120
+    # Optional comma-separated host allowlist (e.g. "github.com,gitlab.com").
+    # Empty means any http(s) host is accepted.
+    git_allowed_hosts: str = ""
+    # Permit cloning from local paths / file:// URLs. Off by default for SSRF and
+    # local-file hygiene; primarily enabled by the test suite.
+    git_allow_local_clones: bool = False
+
     # ---- Scanners / external tools ----
     # Hadolint and Trivy are used only when their binaries are on PATH. Trivy is
     # additionally gated by this flag because base-image scanning needs network
@@ -169,6 +181,15 @@ class Settings(BaseSettings):
             ext.strip().lower()
             for ext in self.allowed_upload_extensions.split(",")
             if ext.strip()
+        }
+
+    @property
+    def git_allowed_hosts_set(self) -> set[str]:
+        """Lower-cased set of allowed clone hosts (empty = allow any host)."""
+        return {
+            host.strip().lower()
+            for host in self.git_allowed_hosts.split(",")
+            if host.strip()
         }
 
     @computed_field  # type: ignore[prop-decorator]

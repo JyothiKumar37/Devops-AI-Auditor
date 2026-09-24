@@ -6,13 +6,18 @@
 # behind a reverse proxy; that is added when the app is deployed.
 # =============================================================================
 
-FROM node:18-alpine
+# Node 20 (active LTS) matches the version the CI quality gate builds/tests with
+# (see .github/workflows/reusable-frontend.yml). Keeping them in lockstep avoids
+# "works in CI, breaks in the image" drift and an end-of-life base runtime.
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies first for better layer caching.
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+# Install dependencies first for better layer caching. `npm ci` installs exactly
+# what the committed lockfile pins, so the published image matches the tree CI
+# verified (reproducible builds); it requires package-lock.json to be present.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
 COPY frontend/ ./
 

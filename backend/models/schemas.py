@@ -87,6 +87,22 @@ class RepositoryFileRead(BaseModel):
     checksum: str
 
 
+class GitScanRequest(BaseModel):
+    """Request to ingest a repository directly from a git clone URL."""
+
+    repository_url: str = Field(
+        ...,
+        min_length=1,
+        max_length=2048,
+        description="HTTP(S) URL of the git repository to clone and analyse.",
+    )
+    ref: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional branch or tag to clone (defaults to the repo's default branch).",
+    )
+
+
 class ScanListResponse(BaseModel):
     """Paginated list of scans."""
 
@@ -100,6 +116,56 @@ class ScanFilesResponse(BaseModel):
     scan_id: uuid.UUID
     total: int
     items: list[RepositoryFileRead]
+
+
+class ScanDiffFinding(BaseModel):
+    """A finding as represented in a scan-to-scan diff (file path resolved)."""
+
+    rule_id: str
+    scanner: str
+    category: str
+    severity: str
+    confidence: str
+    title: str
+    file: str | None = None
+    line: int | None = None
+    recommendation: str = ""
+
+
+class ScanDiffSummary(BaseModel):
+    """Aggregate counts for a scan-to-scan diff."""
+
+    new: int
+    fixed: int
+    unchanged: int
+    base_total: int
+    head_total: int
+
+
+class ScanDiffResponse(BaseModel):
+    """Comparison of a scan (head) against a previous or explicit base scan.
+
+    Findings are matched across scans by a stable fingerprint of
+    (rule_id, file path, evidence) - deliberately independent of line numbers so
+    that unrelated edits shifting a file's line count do not spuriously report a
+    finding as both fixed and new. `base_scan_id` is null when no earlier scan of
+    the repository exists, in which case every current finding is reported as new.
+    """
+
+    base_scan_id: uuid.UUID | None = None
+    head_scan_id: uuid.UUID
+    repository_name: str
+    base_created_at: datetime | None = None
+    head_created_at: datetime
+    base_readiness: int | None = None
+    head_readiness: int
+    readiness_delta: int | None = None
+    summary: ScanDiffSummary
+    new_severity_counts: dict[str, int] = {}
+    fixed_severity_counts: dict[str, int] = {}
+    new_findings: list[ScanDiffFinding] = []
+    fixed_findings: list[ScanDiffFinding] = []
+    unchanged_findings: list[ScanDiffFinding] = []
 
 
 class DiscoveryResponse(BaseModel):

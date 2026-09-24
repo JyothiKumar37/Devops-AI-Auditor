@@ -25,10 +25,12 @@ from models.schemas import (
     DiscoveryResponse,
     FindingRead,
     FindingsResponse,
+    GitScanRequest,
     RemediationProposal,
     RemediationResult,
     RepositoryFileContent,
     RepositoryFileRead,
+    ScanDiffResponse,
     ScanFilesResponse,
     ScanListResponse,
     ScanSummary,
@@ -69,6 +71,28 @@ async def upload_scan(
     return _to_summary(scan, file_count)
 
 
+@router.post(
+    "/git",
+    response_model=ScanSummary,
+    status_code=status.HTTP_201_CREATED,
+    summary="Clone and ingest a repository from a git URL",
+)
+async def ingest_git_scan(
+    request: GitScanRequest,
+    service: ScanServiceDep,
+) -> ScanSummary:
+    """Clone a repository from an http(s) git URL and run the full scan pipeline.
+
+    The clone is shallow, single-branch and non-interactive; repository code is
+    never executed and the working tree is discarded once analysis completes.
+    """
+    scan, file_count = await service.ingest_git_repo(
+        repository_url=request.repository_url,
+        ref=request.ref,
+    )
+    return _to_summary(scan, file_count)
+
+
 @router.get("", response_model=ScanListResponse, summary="List scans")
 async def list_scans(
     service: ScanServiceDep,
@@ -105,6 +129,31 @@ async def get_scan_files(
         total=total,
         items=[RepositoryFileRead.model_validate(f) for f in files],
     )
+
+
+@router.get(
+    "/{scan_id}/diff",
+    response_model=ScanDiffResponse,
+    summary="Compare a scan's findings against a previous or explicit base scan",
+)
+async def get_scan_diff(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+    base: uuid.UUID | None = Query(
+        None,
+        description=(
+            "Explicit base scan to compare against. Defaults to the most recent "
+            "completed scan of the same repository created before this one."
+        ),
+    ),
+) -> ScanDiffResponse:
+    """Diff this scan (head) against a base scan: new, fixed and unchanged findings.
+
+    Findings are matched by a line-independent fingerprint, and the deterministic
+    production-readiness score is reported for both sides with its delta.
+    """
+    result = await service.get_diff(scan_id, base)
+    return ScanDiffResponse.model_validate(result)
 
 
 @router.get(

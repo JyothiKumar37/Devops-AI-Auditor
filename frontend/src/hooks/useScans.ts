@@ -6,10 +6,12 @@ import type {
   DiscoveryResponse,
   FindingFilters,
   FindingsResponse,
+  GitScanRequest,
   RemediationProposal,
   RemediationResult,
   ReportModel,
   RepositoryFileContent,
+  ScanDiffResponse,
   ScanFilesResponse,
   ScanListResponse,
   ScanSummary,
@@ -46,6 +48,14 @@ export function useDiscovery(scanId: string | null) {
   return useQuery<DiscoveryResponse>({
     queryKey: ["discovery", scanId],
     queryFn: () => api.getDiscovery(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useScanDiff(scanId: string | null, base?: string) {
+  return useQuery<ScanDiffResponse>({
+    queryKey: ["diff", scanId, base ?? null],
+    queryFn: () => api.getScanDiff(scanId as string, base),
     enabled: Boolean(scanId),
   });
 }
@@ -122,6 +132,18 @@ export function useUploadScan(onProgress?: (fraction: number) => void) {
   const queryClient = useQueryClient();
   return useMutation<ScanSummary, Error, File>({
     mutationFn: (file: File) => api.uploadScan(file, onProgress),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["scans"] });
+      void queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+/** Clone and ingest a repository directly from a git URL. */
+export function useIngestGitScan() {
+  const queryClient = useQueryClient();
+  return useMutation<ScanSummary, Error, GitScanRequest>({
+    mutationFn: (payload: GitScanRequest) => api.ingestGit(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["scans"] });
       void queryClient.invalidateQueries({ queryKey: ["stats"] });
