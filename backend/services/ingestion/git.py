@@ -39,6 +39,31 @@ _MAX_URL_LENGTH = 2048
 # metacharacters.
 _REF_RE = re.compile(r"^[A-Za-z0-9._][A-Za-z0-9._/\-]{0,254}$")
 
+# Environment variables inherited from the host for the clone subprocess. We
+# deliberately do NOT inherit the whole environment (that would leak the app's
+# own secrets - DB/LLM/API keys - into git), but we must pass through proxy,
+# TLS-trust and locale settings or clones silently stall until they time out on
+# networks that require a proxy. Credential isolation is preserved separately by
+# overriding HOME and disabling system config and interactive prompts.
+_INHERITED_ENV_VARS = (
+    "PATH",
+    "SYSTEMROOT",  # Windows: required for the socket stack.
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "all_proxy",
+    "SSL_CERT_FILE",
+    "SSL_CERT_DIR",
+    "GIT_SSL_CAINFO",
+    "CURL_CA_BUNDLE",
+    "LANG",
+    "LC_ALL",
+)
+
 
 class GitCloneError(Exception):
     """The repository URL is invalid/disallowed or the clone failed."""
@@ -127,17 +152,23 @@ class GitRepositoryCloner:
         cmd += ["--", safe_url, str(dest)]
 
         allowed_protocols = "http:https:file" if self._allow_local else "http:https"
-        # A minimal, isolated environment: HOME points inside the workspace so no
-        # user git config or stored credentials are ever read, and interactive
-        # credential prompts are disabled so a private repo fails fast.
-        env = {
-            "PATH": os.environ.get("PATH", ""),
-            "HOME": str(dest.parent),
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_ASKPASS": "",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_ALLOW_PROTOCOL": allowed_protocols,
-        }
+        # Inherit only connectivity/locale settings (proxies, TLS trust, locale)
+        # so clones succeed behind a proxy or with a custom trust store, without
+        # leaking the application's own secrets into the git subprocess. HOME is
+        # pointed inside the isolated workspace so no user git config or stored
+        # credentials are read, system config is disabled, and interactive
+        # credential prompts are turned off so a private repo fails fast.
+        env = {name: os.environ[name] for name in _INHERITED_ENV_VARS if name in os.environ}
+        env.setdefault("PATH", os.environ.get("PATH", ""))
+        env.update(
+            {
+                "HOME": str(dest.parent),
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_ASKPASS": "",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_ALLOW_PROTOCOL": allowed_protocols,
+            }
+        )
 
         try:
             result = subprocess.run(  # noqa: S603 - fixed argv, no shell

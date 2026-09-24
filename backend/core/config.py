@@ -93,8 +93,10 @@ class Settings(BaseSettings):
     # ---- Ingestion / git ----
     # Enable cloning repositories directly from a URL (POST /scans/git).
     git_ingestion_enabled: bool = True
-    # Maximum seconds a clone may run before it is aborted.
-    git_clone_timeout: int = 120
+    # Maximum seconds a clone may run before it is aborted. Generous by default
+    # so large repositories on slower links still complete; tune down for public
+    # exposure.
+    git_clone_timeout: int = 300
     # Optional comma-separated host allowlist (e.g. "github.com,gitlab.com").
     # Empty means any http(s) host is accepted.
     git_allowed_hosts: str = ""
