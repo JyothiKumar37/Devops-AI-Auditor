@@ -20,6 +20,13 @@ RUN pip install --upgrade pip && pip install .
 
 # ---- Runtime ----
 FROM base AS runtime
+# git is required at runtime for cloning repositories via the Git-ingestion
+# endpoint (POST /api/v1/scans/git); ca-certificates lets those https clones
+# verify TLS. Installed here (not in the builder) to keep the runtime image lean.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # Bring in installed packages and console scripts (uvicorn, celery) from builder.
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
