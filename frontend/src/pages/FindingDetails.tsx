@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { CodeViewer } from "@/components/CodeViewer";
@@ -10,8 +10,17 @@ import {
   useGenerateRemediation,
   useReport,
   useScanFiles,
+  useSuppressFinding,
+  useUnsuppressFinding,
 } from "@/hooks/useScans";
 import { prettyLabel } from "@/lib/format";
+import type { SuppressionReason } from "@/types/api";
+
+const REASON_LABELS: Record<SuppressionReason, string> = {
+  false_positive: "False positive",
+  accepted_risk: "Accepted risk",
+  wont_fix: "Won't fix",
+};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -38,6 +47,10 @@ export default function FindingDetails() {
 
   const generate = useGenerateRemediation(id ?? "", fid);
   const apply = useApplyRemediation(id ?? "", fid);
+  const suppress = useSuppressFinding(id ?? "");
+  const unsuppress = useUnsuppressFinding(id ?? "");
+  const [reason, setReason] = useState<SuppressionReason>("false_positive");
+  const [note, setNote] = useState("");
 
   const finding = data?.items.find((f) => f.id === findingId);
   const file = useMemo(
@@ -108,6 +121,14 @@ export default function FindingDetails() {
               <SeverityPill severity={finding.severity} />
               <Badge className="bg-slate-50 text-slate-700 ring-slate-200">{finding.scanner}</Badge>
               <Badge className="bg-slate-50 text-slate-500 ring-slate-200">{finding.rule_id}</Badge>
+              {finding.scanner === "ai-review" ? (
+                <Badge className="bg-violet-100 text-violet-700 ring-violet-200">
+                  AI-generated
+                </Badge>
+              ) : null}
+              {finding.suppressed ? (
+                <Badge className="bg-slate-200 text-slate-600 ring-slate-300">Suppressed</Badge>
+              ) : null}
             </div>
             <h1 className="text-lg font-semibold text-slate-900">{finding.title}</h1>
             <p className="mt-1 font-mono text-xs text-slate-500">
@@ -130,6 +151,70 @@ export default function FindingDetails() {
             <div className="flex flex-wrap gap-6 pt-1 text-xs text-slate-500">
               <span>Category: {prettyLabel(finding.category)}</span>
               <span>Confidence: {prettyLabel(finding.confidence)}</span>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+              {finding.suppressed ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-slate-200 text-slate-700 ring-slate-300">Baselined</Badge>
+                    <span className="text-xs text-slate-600">
+                      {REASON_LABELS[finding.suppression_reason ?? "false_positive"]}
+                    </span>
+                  </div>
+                  {finding.suppression_note ? (
+                    <p className="text-xs text-slate-500">{finding.suppression_note}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => unsuppress.mutate(finding.id)}
+                    disabled={unsuppress.isPending}
+                    className="self-start rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {unsuppress.isPending ? "Removing…" : "Un-suppress"}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Baseline this finding
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value as SuppressionReason)}
+                      className="input max-w-[10rem]"
+                    >
+                      <option value="false_positive">False positive</option>
+                      <option value="accepted_risk">Accepted risk</option>
+                      <option value="wont_fix">Won't fix</option>
+                    </select>
+                    <input
+                      className="input min-w-[8rem] flex-1"
+                      placeholder="Optional note"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        suppress.mutate({
+                          findingId: finding.id,
+                          reason,
+                          note: note.trim() || undefined,
+                        })
+                      }
+                      disabled={suppress.isPending}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {suppress.isPending ? "Suppressing…" : "Suppress"}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Hidden from the active list and re-applied to future scans of this repository.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </Card>
@@ -194,12 +279,21 @@ export default function FindingDetails() {
 
         {proposal?.status === "manual_required" ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-amber-700">Manual remediation required.</p>
-            <p className="mt-1 text-sm text-amber-100/80">
-              No safe automatic fix can be generated for this finding without guessing a value.
+            <p className="text-sm font-medium text-amber-800">
+              {proposal.guidance ? proposal.summary : "Manual remediation required."}
             </p>
+            <p className="mt-1 text-sm text-amber-700">
+              {proposal.guidance
+                ? "This can't be auto-applied safely, so apply the recommended pattern by hand:"
+                : "No safe automatic fix can be generated for this finding without guessing a value."}
+            </p>
+            {proposal.guidance ? (
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg border border-amber-200 bg-white p-3 font-mono text-xs text-slate-800">
+                {proposal.guidance}
+              </pre>
+            ) : null}
             {proposal.rationale ? (
-              <p className="mt-2 text-xs text-amber-100/70">{proposal.rationale}</p>
+              <p className="mt-2 text-xs text-amber-700">{proposal.rationale}</p>
             ) : null}
           </div>
         ) : null}

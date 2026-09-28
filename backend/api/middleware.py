@@ -55,7 +55,13 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         if self._api_key and self._requires_auth(request):
-            provided = request.headers.get("x-api-key", "")
+            # Header is preferred; the query-param fallback lets header-less
+            # clients (e.g. an EventSource/SSE connection) authenticate too.
+            provided = (
+                request.headers.get("x-api-key")
+                or request.query_params.get("api_key")
+                or ""
+            )
             if not hmac.compare_digest(provided, self._api_key):
                 logger.warning("auth_rejected", path=request.url.path)
                 return _error(401, "unauthorized", "A valid API key is required.")

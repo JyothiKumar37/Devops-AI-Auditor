@@ -8,6 +8,7 @@ plus the query endpoints and rejection paths.
 from __future__ import annotations
 
 import io
+import json
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -220,6 +221,28 @@ def test_findings_endpoint(client: TestClient) -> None:
 def test_findings_unknown_scan_404(client: TestClient) -> None:
     missing = "00000000-0000-0000-0000-000000000000"
     assert client.get(f"/api/v1/scans/{missing}/findings").status_code == 404
+
+
+def test_scan_stream_emits_status_and_closes(client: TestClient) -> None:
+    scan_id = _upload(client, _repo_zip()).json()["id"]  # type: ignore[attr-defined]
+
+    events: list[dict] = []
+    with client.stream("GET", f"/api/v1/scans/{scan_id}/stream") as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        for line in response.iter_lines():
+            if line.startswith("data: "):
+                events.append(json.loads(line[len("data: ") :]))
+                break  # the scan is already completed -> one event, then close
+
+    assert events, "expected at least one SSE data event"
+    assert events[0]["id"] == scan_id
+    assert events[0]["status"] == "completed"
+
+
+def test_scan_stream_unknown_scan_404(client: TestClient) -> None:
+    missing = "00000000-0000-0000-0000-000000000000"
+    assert client.get(f"/api/v1/scans/{missing}/stream").status_code == 404
 
 
 def _shell_zip() -> bytes:

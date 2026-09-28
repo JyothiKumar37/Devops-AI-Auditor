@@ -10,6 +10,7 @@ import type {
   FindingsResponse,
   GitScanRequest,
   HealthResponse,
+  LLMHealth,
   RemediationProposal,
   RemediationResult,
   ReportModel,
@@ -19,6 +20,8 @@ import type {
   ScanListResponse,
   ScanSummary,
   StatsResponse,
+  SuppressionRead,
+  SuppressRequest,
 } from "@/types/api";
 
 const API_V1 = "/api/v1";
@@ -82,6 +85,21 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function del(path: string): Promise<void> {
+  const response = await fetch(path, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok && response.status !== 204) {
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    throw new ApiError(
+      body?.error?.message ?? `Request to ${path} failed`,
+      response.status,
+      body?.error?.code,
+    );
+  }
+}
+
 /**
  * Upload a repository ZIP with progress reporting.
  *
@@ -135,6 +153,8 @@ function query(params: Record<string, string | undefined>): string {
 export const api = {
   /** Readiness health, including per-dependency status, version and environment. */
   getHealth: () => request<HealthResponse>(`${API_V1}/health/ready`),
+  /** On-demand LLM connectivity check (provider reachable + model valid). */
+  getLLMHealth: () => request<LLMHealth>(`${API_V1}/health/llm`),
   /** Aggregate dashboard metrics. */
   getStats: () => request<StatsResponse>(`${API_V1}/stats`),
   /** List scans, most recent first. */
@@ -149,6 +169,8 @@ export const api = {
   /** Diff a scan's findings against a previous (or explicit) base scan. */
   getScanDiff: (id: string, base?: string) =>
     request<ScanDiffResponse>(`${API_V1}/scans/${id}/diff${query({ base })}`),
+  /** URL of the server-sent-events stream of a scan's status. */
+  scanStreamUrl: (id: string) => `${API_V1}/scans/${id}/stream`,
   /** List repository files for a scan. */
   getScanFiles: (id: string) =>
     request<ScanFilesResponse>(`${API_V1}/scans/${id}/files?limit=2000`),
@@ -161,7 +183,7 @@ export const api = {
   /** Fetch the AI reasoning report (production readiness, groups, recommendations). */
   getReport: (id: string) => request<AuditReport>(`${API_V1}/scans/${id}/report`),
   /** URL that exports the full audit report in the given format (json|html|pdf). */
-  reportExportUrl: (id: string, format: "json" | "html" | "pdf", download = true) =>
+  reportExportUrl: (id: string, format: "json" | "html" | "pdf" | "sarif", download = true) =>
     `${API_V1}/scans/${id}/report/export?format=${format}&download=${download}`,
   /** Fetch the full structured report model for in-app viewing. */
   getReportModel: (id: string) =>
@@ -174,5 +196,14 @@ export const api = {
     post<RemediationResult>(
       `${API_V1}/scans/${scanId}/findings/${findingId}/remediation/apply`,
     ),
+  /** Suppress (baseline) a finding for its repository. */
+  suppressFinding: (scanId: string, findingId: string, payload: SuppressRequest) =>
+    postJson<SuppressionRead>(
+      `${API_V1}/scans/${scanId}/findings/${findingId}/suppress`,
+      payload,
+    ),
+  /** Remove a finding's baseline (un-suppress). */
+  unsuppressFinding: (scanId: string, findingId: string) =>
+    del(`${API_V1}/scans/${scanId}/findings/${findingId}/suppress`),
   uploadScan,
 };

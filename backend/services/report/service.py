@@ -19,11 +19,14 @@ from core.config import Settings
 from core.exceptions import NotFoundError
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
+from services.fingerprint import finding_fingerprint
 from services.report.builder import build_report_model
 from services.report.html_report import render_html
 from services.report.json_report import render_json
 from services.report.model import ReportModel
 from services.report.pdf_report import render_pdf
+from services.report.sarif_report import render_sarif
+from services.suppression_service import suppressed_fingerprints
 
 
 class ReportFormat(str, Enum):
@@ -32,14 +35,21 @@ class ReportFormat(str, Enum):
     JSON = "json"
     HTML = "html"
     PDF = "pdf"
+    SARIF = "sarif"
 
 
 _MEDIA_TYPE = {
     ReportFormat.JSON: "application/json",
     ReportFormat.HTML: "text/html; charset=utf-8",
     ReportFormat.PDF: "application/pdf",
+    ReportFormat.SARIF: "application/sarif+json",
 }
-_EXTENSION = {ReportFormat.JSON: "json", ReportFormat.HTML: "html", ReportFormat.PDF: "pdf"}
+_EXTENSION = {
+    ReportFormat.JSON: "json",
+    ReportFormat.HTML: "html",
+    ReportFormat.PDF: "pdf",
+    ReportFormat.SARIF: "sarif",
+}
 
 
 def _slugify(name: str) -> str:
@@ -75,6 +85,17 @@ class ReportService:
                 )
             ).all()
         )
+        # Exclude suppressed (baselined) findings so every export format reflects
+        # the same active posture as the readiness assessment.
+        suppressed = await suppressed_fingerprints(self._session, scan.repository_name)
+        findings_rows = [
+            f
+            for f in findings_rows
+            if finding_fingerprint(
+                f.rule_id, path_by_id.get(f.file_id) if f.file_id else "", f.evidence
+            )
+            not in suppressed
+        ]
 
         # The reasoning report supplies understanding, readiness and cross-file
         # groups (deterministic when no LLM is configured).
@@ -93,6 +114,8 @@ class ReportService:
             content = render_json(model)
         elif fmt is ReportFormat.HTML:
             content = render_html(model).encode("utf-8")
+        elif fmt is ReportFormat.SARIF:
+            content = render_sarif(model)
         else:
             content = render_pdf(model)
 

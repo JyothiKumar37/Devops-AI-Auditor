@@ -50,6 +50,63 @@ from services.remediation import (
 logger = get_logger(__name__)
 
 
+# Generic guidance for any secret finding: the value cannot be auto-fixed
+# (there is no safe way to invent a credential id / store), but the remediation
+# pattern is well established.
+_SECRETS_GENERIC = (
+    "Move the secret out of source control and reference it indirectly:\n"
+    "1. Store the value in a secrets manager or your CI/CD credentials store.\n"
+    "2. Reference it via an environment variable or secret binding - never a literal.\n"
+    "3. Rotate the exposed value and purge it from the git history."
+)
+
+# Rule-specific recommended patterns (title, snippet). Shown read-only; never
+# applied automatically.
+_GUIDANCE_BY_RULE: dict[str, tuple[str, str]] = {
+    "JNK001": (
+        "Use the Jenkins credentials store",
+        "Bind the credential instead of hardcoding it:\n\n"
+        "withCredentials([string(credentialsId: '<your-credential-id>', "
+        "variable: 'GIT_TOKEN')]) {\n"
+        "    sh 'git clone https://$GIT_USER:$GIT_TOKEN@github.com/org/repo.git'\n"
+        "}\n\n"
+        "Create the credential in Manage Jenkins -> Credentials, then rotate the "
+        "leaked token.",
+    ),
+    "GHA001": (
+        "Use GitHub Actions secrets",
+        "Reference an encrypted secret instead of a literal:\n\n"
+        "env:\n  TOKEN: ${{ secrets.MY_TOKEN }}\n\n"
+        "Add the secret under Settings -> Secrets and variables -> Actions, then "
+        "rotate the exposed value.",
+    ),
+    "GLC001": (
+        "Use GitLab CI/CD variables",
+        "Reference a masked/protected CI variable instead of a literal:\n\n"
+        "script:\n  - deploy --token \"$MY_TOKEN\"\n\n"
+        "Define MY_TOKEN under Settings -> CI/CD -> Variables (masked), then "
+        "rotate the exposed value.",
+    ),
+}
+
+_SECRET_SCANNERS = {"secret-scanner"}
+
+
+def guidance_for(rule_id: str, category: str, scanner: str) -> tuple[str, str] | None:
+    """Return (title, recommended-pattern) guidance for a finding, or None.
+
+    Guidance is advisory only - it is never applied to a file. It is offered for
+    findings that have no safe automatic fix but a well-known manual remediation
+    (chiefly secrets).
+    """
+    specific = _GUIDANCE_BY_RULE.get(rule_id)
+    if specific is not None:
+        return specific
+    if category == "secrets" or scanner in _SECRET_SCANNERS:
+        return ("Move the secret to a secrets manager", _SECRETS_GENERIC)
+    return None
+
+
 class RemediationService:
     """Proposes and (on approval) applies deterministic fixes to stored files."""
 
@@ -65,6 +122,7 @@ class RemediationService:
         """Return a fix proposal for a finding without mutating anything."""
         finding, repo_file = await self._load(scan_id, finding_id)
         confidence = Confidence(finding.confidence)
+        guidance = guidance_for(finding.rule_id, str(finding.category), finding.scanner)
 
         if repo_file is None or repo_file.content is None:
             return self._manual_proposal(
@@ -72,6 +130,7 @@ class RemediationService:
                 confidence,
                 repo_file.path if repo_file else None,
                 "The file content is not stored, so no automatic fix can be generated.",
+                guidance,
             )
         content = repo_file.content
 
@@ -79,7 +138,7 @@ class RemediationService:
             content, finding.rule_id, finding.line_number, finding.evidence
         )
         if outcome is None:
-            return self._manual_proposal(finding, confidence, repo_file.path)
+            return self._manual_proposal(finding, confidence, repo_file.path, guidance=guidance)
 
         before, after = changed_lines(content, outcome.new_content)
         return RemediationProposal(
@@ -235,18 +294,21 @@ class RemediationService:
         confidence: Confidence,
         file_path: str | None,
         message: str = MANUAL_REQUIRED,
+        guidance: tuple[str, str] | None = None,
     ) -> RemediationProposal:
+        title, snippet = guidance if guidance else (None, None)
         return RemediationProposal(
             finding_id=finding.id,
             rule_id=finding.rule_id,
             status=RemediationStatus.MANUAL_REQUIRED,
-            summary=MANUAL_REQUIRED,
+            summary=title or MANUAL_REQUIRED,
             rationale=finding.recommendation or "",
             confidence=confidence,
             file_path=file_path,
             before=None,
             after=None,
             diff=None,
+            guidance=snippet,
             message=message,
         )
 

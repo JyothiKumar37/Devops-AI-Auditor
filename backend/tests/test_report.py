@@ -27,6 +27,7 @@ from services.report.html_report import render_html
 from services.report.json_report import render_json
 from services.report.model import REPORT_SCHEMA_VERSION
 from services.report.pdf_report import render_pdf
+from services.report.sarif_report import render_sarif
 
 # ---------------------------------------------------------------------------
 # Builder (in-memory, no DB)
@@ -252,6 +253,43 @@ def test_pdf_is_valid() -> None:
     assert len(pdf) > 1000
 
 
+def test_sarif_structure_is_valid() -> None:
+    doc = json.loads(render_sarif(_build()))
+    assert doc["version"] == "2.1.0"
+    run = doc["runs"][0]
+    assert run["tool"]["driver"]["name"] == "DevOps AI Auditor"
+
+    rules = run["tool"]["driver"]["rules"]
+    rule_ids = [r["id"] for r in rules]
+    # Exactly one rule per distinct rule_id.
+    assert len(rule_ids) == len(set(rule_ids))
+    assert set(rule_ids) == {"DCK005", "DCK003", "TF004", "K8S001", "SEC010"}
+
+    results = run["results"]
+    assert len(results) == 5
+    # Every result's ruleIndex resolves to its rule.
+    for res in results:
+        assert rules[res["ruleIndex"]]["id"] == res["ruleId"]
+
+    by_rule = {res["ruleId"]: res for res in results}
+    # Severity -> SARIF level mapping.
+    assert by_rule["DCK005"]["level"] == "error"  # critical
+    assert by_rule["DCK003"]["level"] == "error"  # high
+    assert by_rule["K8S001"]["level"] == "warning"  # medium
+    assert by_rule["SEC010"]["level"] == "note"  # low
+
+    # A finding with a file+line carries a physical location.
+    tf = by_rule["TF004"]
+    physical = tf["locations"][0]["physicalLocation"]
+    assert physical["artifactLocation"]["uri"] == "main.tf"
+    assert physical["region"]["startLine"] == 3
+    assert "partialFingerprints" in tf
+
+    # GitHub code-scanning security-severity is set on rules.
+    dck5 = next(r for r in rules if r["id"] == "DCK005")
+    assert dck5["properties"]["security-severity"] == "9.5"
+
+
 # ---------------------------------------------------------------------------
 # Export endpoint (integration)
 # ---------------------------------------------------------------------------
@@ -322,6 +360,36 @@ def test_export_pdf(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/pdf"
     assert response.content.startswith(b"%PDF-")
+
+
+def test_export_sarif(client: TestClient) -> None:
+    scan_id = _upload(client)
+    response = client.get(f"/api/v1/scans/{scan_id}/report/export?format=sarif")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/sarif+json")
+    assert response.headers["content-disposition"].endswith('.sarif"')
+    doc = response.json()
+    assert doc["version"] == "2.1.0"
+    assert doc["runs"][0]["tool"]["driver"]["name"] == "DevOps AI Auditor"
+    assert len(doc["runs"][0]["results"]) > 0
+    # Masked evidence: the raw AWS key must never leak into the SARIF either.
+    assert "AKIAIOSFODNN7EXAMPLE" not in response.text
+
+
+def test_export_excludes_suppressed_findings(client: TestClient) -> None:
+    scan_id = _upload(client)
+    before = client.get(f"/api/v1/scans/{scan_id}/report/export?format=json").json()
+
+    finding = client.get(f"/api/v1/scans/{scan_id}/findings").json()["items"][0]
+    resp = client.post(
+        f"/api/v1/scans/{scan_id}/findings/{finding['id']}/suppress",
+        json={"reason": "false_positive"},
+    )
+    assert resp.status_code == 201
+
+    after = client.get(f"/api/v1/scans/{scan_id}/report/export?format=json").json()
+    assert after["total_findings"] < before["total_findings"]
+    assert finding["id"] not in {f["id"] for f in after["detailed_findings"]}
 
 
 def test_export_inline_disposition(client: TestClient) -> None:

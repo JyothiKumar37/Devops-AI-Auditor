@@ -51,6 +51,15 @@ export interface GitScanRequest {
   ref?: string | null;
 }
 
+export interface LLMHealth {
+  provider: string;
+  model: string;
+  configured: boolean;
+  ok: boolean;
+  detail: string;
+  latency_ms: number | null;
+}
+
 export interface ScanDiffFinding {
   rule_id: string;
   scanner: string;
@@ -200,6 +209,8 @@ export interface FindingGroup {
 
 export type ConfidenceLevel = "low" | "medium" | "high";
 
+export type SuppressionReason = "false_positive" | "accepted_risk" | "wont_fix";
+
 export interface Finding {
   id: string;
   scan_id: string;
@@ -214,13 +225,33 @@ export interface Finding {
   recommendation: string;
   rule_id: string;
   scanner: string;
+  suppressed: boolean;
+  suppression_reason: SuppressionReason | null;
+  suppression_note: string | null;
 }
 
 export interface FindingsResponse {
   scan_id: string;
   total: number;
   severity_counts: Record<string, number>;
+  suppressed_count: number;
   items: Finding[];
+}
+
+export interface SuppressRequest {
+  reason: SuppressionReason;
+  note?: string;
+}
+
+export interface SuppressionRead {
+  id: string;
+  repository_name: string;
+  fingerprint: string;
+  rule_id: string;
+  file_path: string | null;
+  reason: SuppressionReason;
+  note: string;
+  created_at: string;
 }
 
 export interface ScanFilesResponse {
@@ -387,6 +418,7 @@ export interface RemediationProposal {
   before: string | null;
   after: string | null;
   diff: string | null;
+  guidance: string | null;
   message: string;
 }
 

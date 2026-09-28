@@ -20,6 +20,8 @@ from core.exceptions import NotFoundError
 from core.logging import get_logger
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
+from services.fingerprint import finding_fingerprint
+from services.suppression_service import suppressed_fingerprints
 
 logger = get_logger(__name__)
 
@@ -63,7 +65,18 @@ class ReasoningService:
         findings_rows = (
             await self._session.scalars(select(Finding).where(Finding.scan_id == scan_id))
         ).all()
-        findings = [self._normalize(f, path_by_id) for f in findings_rows]
+        # Exclude suppressed (baselined) findings so the report and its readiness
+        # assessment reflect the repository's active posture.
+        suppressed = await suppressed_fingerprints(self._session, scan.repository_name)
+        active_rows = [
+            f
+            for f in findings_rows
+            if finding_fingerprint(
+                f.rule_id, path_by_id.get(f.file_id) if f.file_id else "", f.evidence
+            )
+            not in suppressed
+        ]
+        findings = [self._normalize(f, path_by_id) for f in active_rows]
         relationships = [f for f in findings if f["rule_id"] in _RELATIONSHIP_RULES]
 
         provider = get_provider(self._settings)

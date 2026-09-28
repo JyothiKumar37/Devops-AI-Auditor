@@ -31,6 +31,7 @@ from scanners.kubernetes import KubernetesScanner
 from scanners.shell import ShellScanner
 from scanners.terraform import TerraformScanner
 from services.remediation import MANUAL_REQUIRED, build_diff, changed_lines, propose_fix
+from services.remediation_service import guidance_for
 
 # ---------------------------------------------------------------------------
 # Fixer engine: each fixer must resolve its finding on re-scan
@@ -259,6 +260,25 @@ def test_unmapped_rule_is_manual() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Guidance: secret findings get a read-only recommended pattern (not applied)
+# ---------------------------------------------------------------------------
+
+
+def test_guidance_for_secret_findings() -> None:
+    # Rule-specific guidance.
+    jenkins = guidance_for("JNK001", "secrets", "jenkins-rules")
+    assert jenkins is not None and "withCredentials" in jenkins[1]
+
+    # Generic fallback by category and by scanner.
+    by_category = guidance_for("SEC999", "secrets", "some-rules")
+    assert by_category is not None and "secrets manager" in by_category[1].lower()
+    assert guidance_for("X", "other", "secret-scanner") is not None
+
+    # Non-secret, unmapped rules get no guidance.
+    assert guidance_for("DCK001", "best_practice", "docker-rules") is None
+
+
+# ---------------------------------------------------------------------------
 # Diff helpers
 # ---------------------------------------------------------------------------
 
@@ -378,6 +398,24 @@ def test_workflow_config_fix_resolves(client: TestClient) -> None:
 
     remaining = client.get(f"/api/v1/scans/{scan_id}/findings").json()["items"]
     assert not any(f["id"] == fid for f in remaining)
+
+
+def test_workflow_secret_finding_offers_guidance(client: TestClient) -> None:
+    # A hard-coded secret (DCK005, category=secrets) has no safe auto-fix, but
+    # the proposal must carry read-only guidance instead of a bare manual notice.
+    scan_id = _upload(
+        client,
+        {"Dockerfile": b"FROM python:3.11-slim\nENV DB_PASSWORD=hunter2plaintext\nUSER 1000\n"},
+    )
+    finding = _finding_by_rule(client, scan_id, "DCK005")
+    fid = finding["id"]
+
+    proposal = client.post(
+        f"/api/v1/scans/{scan_id}/findings/{fid}/remediation"
+    ).json()
+    assert proposal["status"] == "manual_required"
+    assert proposal["diff"] is None  # never auto-applied
+    assert proposal["guidance"] and "secrets manager" in proposal["guidance"].lower()
 
 
 def test_workflow_manual_required_for_unfixable(client: TestClient) -> None:

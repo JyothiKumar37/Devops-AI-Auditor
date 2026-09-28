@@ -38,6 +38,17 @@ class LivenessResponse(BaseModel):
     status: str = "ok"
 
 
+class LLMHealthResponse(BaseModel):
+    """Result of an on-demand LLM connectivity check."""
+
+    provider: str
+    model: str
+    configured: bool
+    ok: bool
+    detail: str
+    latency_ms: int | None = None
+
+
 class ServiceInfo(BaseModel):
     """Basic service metadata returned at the API root."""
 
@@ -186,7 +197,12 @@ class DiscoveryResponse(BaseModel):
 # Finding schemas
 # ---------------------------------------------------------------------------
 
-from models.enums import Confidence, FindingCategory, Severity  # noqa: E402
+from models.enums import (  # noqa: E402
+    Confidence,
+    FindingCategory,
+    Severity,
+    SuppressionReason,
+)
 
 
 class FindingRead(BaseModel):
@@ -207,6 +223,10 @@ class FindingRead(BaseModel):
     recommendation: str
     rule_id: str
     scanner: str
+    # Baseline/suppression status (annotated at read time, not stored on the row).
+    suppressed: bool = False
+    suppression_reason: SuppressionReason | None = None
+    suppression_note: str | None = None
 
 
 class FindingsResponse(BaseModel):
@@ -215,7 +235,39 @@ class FindingsResponse(BaseModel):
     scan_id: uuid.UUID
     total: int
     severity_counts: dict[str, int]
+    # How many of the scan's findings are currently suppressed (baselined).
+    suppressed_count: int = 0
     items: list[FindingRead]
+
+
+class SuppressRequest(BaseModel):
+    """Request to suppress (baseline) a finding across a repository."""
+
+    reason: SuppressionReason
+    note: str = Field(default="", max_length=1000)
+
+
+class SuppressionRead(BaseModel):
+    """A persisted suppression (baseline) entry."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    repository_name: str
+    fingerprint: str
+    rule_id: str
+    file_path: str | None = None
+    reason: SuppressionReason
+    note: str
+    created_at: datetime
+
+
+class SuppressionListResponse(BaseModel):
+    """Suppressions currently in effect for a repository."""
+
+    repository_name: str
+    total: int
+    items: list[SuppressionRead]
 
 
 class RepositoryFileContent(BaseModel):
@@ -283,6 +335,9 @@ class RemediationProposal(BaseModel):
     before: str | None = None
     after: str | None = None
     diff: str | None = None
+    # Read-only recommended fix pattern for findings that cannot be auto-applied
+    # safely (e.g. secrets). Guidance only - never applied to any file.
+    guidance: str | None = None
     message: str
 
 

@@ -1,5 +1,7 @@
+import { useState } from "react";
+
 import { Badge, Card, PageHeader } from "@/components/ui";
-import { useHealth } from "@/hooks/useHealth";
+import { useHealth, useLLMHealth } from "@/hooks/useHealth";
 import { SCANNER_CATALOG } from "@/data/scanners";
 import { MAX_UPLOAD_MB } from "@/lib/format";
 
@@ -14,6 +16,16 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function Settings() {
   const { data: health } = useHealth();
+  const [checkLLM, setCheckLLM] = useState(false);
+  const { data: llm, isFetching: llmChecking, refetch: refetchLLM } = useLLMHealth(checkLLM);
+
+  const llmBadge = !llm
+    ? null
+    : !llm.configured
+      ? { text: "not configured", cls: "bg-slate-100 text-slate-600 ring-slate-300" }
+      : llm.ok
+        ? { text: "connected", cls: "bg-emerald-50 text-emerald-700 ring-emerald-600/20" }
+        : { text: "error", cls: "bg-rose-50 text-rose-700 ring-rose-600/20" };
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -49,6 +61,45 @@ export default function Settings() {
               }
             />
           ))}
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">AI provider</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setCheckLLM(true);
+                void refetchLLM();
+              }}
+              disabled={llmChecking}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              {llmChecking ? "Checking…" : "Check connection"}
+            </button>
+          </div>
+          {!checkLLM ? (
+            <p className="text-xs text-slate-500">
+              Runs a live connectivity check against the configured LLM (one small model call).
+            </p>
+          ) : llmChecking && !llm ? (
+            <Row label="Status" value="Checking…" />
+          ) : llm && llmBadge ? (
+            <>
+              <Row label="Provider" value={llm.provider} />
+              <Row label="Model" value={<span className="font-mono text-xs">{llm.model}</span>} />
+              <Row label="Status" value={<Badge className={llmBadge.cls}>{llmBadge.text}</Badge>} />
+              <Row label="Detail" value={<span className="text-slate-500">{llm.detail}</span>} />
+              {llm.latency_ms != null ? (
+                <Row label="Latency" value={`${llm.latency_ms} ms`} />
+              ) : null}
+            </>
+          ) : (
+            <Row
+              label="Status"
+              value={<span className="text-rose-700">check failed (endpoint unreachable)</span>}
+            />
+          )}
         </Card>
 
         <Card className="p-5">

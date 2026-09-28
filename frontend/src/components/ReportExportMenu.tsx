@@ -6,12 +6,13 @@ import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api";
 
-type Format = "json" | "html" | "pdf";
+type Format = "json" | "html" | "pdf" | "sarif";
 
-const FORMATS: { format: Format; label: string }[] = [
-  { format: "pdf", label: "PDF" },
-  { format: "html", label: "HTML" },
-  { format: "json", label: "JSON" },
+const FORMATS: { format: Format; label: string; title: string }[] = [
+  { format: "pdf", label: "PDF", title: "Download as PDF" },
+  { format: "html", label: "HTML", title: "Download as HTML" },
+  { format: "json", label: "JSON", title: "Download as JSON" },
+  { format: "sarif", label: "SARIF", title: "Download SARIF for CI / code scanning" },
 ];
 
 export function ReportExportMenu({
@@ -43,10 +44,11 @@ export function ReportExportMenu({
         View report
       </Link>
       <div className="flex overflow-hidden rounded-lg border border-slate-200">
-        {FORMATS.map(({ format, label }, index) => (
+        {FORMATS.map(({ format, label, title }, index) => (
           <a
             key={format}
             href={api.reportExportUrl(scanId, format)}
+            title={title}
             className={`px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
               index > 0 ? "border-l border-slate-200" : ""
             }`}

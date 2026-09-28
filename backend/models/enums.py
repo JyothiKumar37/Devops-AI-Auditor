@@ -72,6 +72,14 @@ class FindingCategory(str, Enum):
     CONFIGURATION = "configuration"
 
 
+class SuppressionReason(str, Enum):
+    """Why a finding was suppressed (baselined) by a user."""
+
+    FALSE_POSITIVE = "false_positive"
+    ACCEPTED_RISK = "accepted_risk"
+    WONT_FIX = "wont_fix"
+
+
 class ScannerType(str, Enum):
     """Artifact categories the auditor is designed to analyse."""
 

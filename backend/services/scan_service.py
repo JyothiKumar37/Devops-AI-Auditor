@@ -21,6 +21,7 @@ from typing import Any, BinaryIO
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.ai_review import AIReviewScanner
 from agents.discovery import RepositoryDiscoveryAgent, category_for
 from agents.discovery.types import DiscoveredFile, FileCategory
 from core.config import Settings
@@ -29,6 +30,7 @@ from core.logging import get_logger
 from models.enums import ScanStatus, Severity, SourceType
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
+from models.suppression import Suppression
 from scanners.ansible import AnsibleScanner
 from scanners.cicd import CICDScanner
 from scanners.compose import DockerComposeScanner
@@ -42,9 +44,11 @@ from scanners.low_signal import downrank_if_low_signal
 from scanners.secrets import SecretScanner
 from scanners.shell import ShellScanner
 from scanners.terraform import TerraformScanner
+from services.fingerprint import finding_fingerprint
 from services.ingestion.archive import ArchiveValidationError, ZipArchiveExtractor
 from services.ingestion.git import GitCloneError, GitRepositoryCloner
 from services.ingestion.workspace import Workspace, WorkspaceManager
+from services.suppression_service import suppressed_fingerprints
 
 logger = get_logger(__name__)
 
@@ -175,8 +179,15 @@ class ScanService:
         confidence: str | None = None,
         file_id: uuid.UUID | None = None,
         file_type: str | None = None,
-    ) -> tuple[list[Finding], dict[str, int]]:
-        """Return a scan's findings (optionally filtered) plus per-severity counts."""
+        suppressed: bool | None = None,
+    ) -> tuple[list[Finding], dict[str, int], int]:
+        """Return a scan's findings (optionally filtered), severity counts and the
+        number of suppressed (baselined) findings.
+
+        Each returned finding is annotated with its baseline status
+        (`suppressed`, `suppression_reason`, `suppression_note`). The optional
+        `suppressed` filter keeps only suppressed or only active findings.
+        """
         scan = await self._session.get(Scan, scan_id)
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} not found.")
@@ -200,6 +211,15 @@ class ScanService:
 
         stmt = select(Finding).where(*conditions)
         findings = list((await self._session.scalars(stmt)).all())
+
+        # Annotate baseline status from the repository's suppressions.
+        await self._annotate_suppression(scan, findings)
+        suppressed_count = sum(1 for f in findings if getattr(f, "suppressed", False))
+        if suppressed is not None:
+            findings = [
+                f for f in findings if bool(getattr(f, "suppressed", False)) is suppressed
+            ]
+
         # Deterministic ordering: most severe first, then by file and line.
         findings.sort(
             key=lambda f: (
@@ -219,7 +239,38 @@ class ScanService:
         for sev, count in count_rows.all():
             counts[str(sev)] = int(count)
 
-        return findings, counts
+        return findings, counts, suppressed_count
+
+    async def _annotate_suppression(
+        self, scan: Scan, findings: list[Finding]
+    ) -> None:
+        """Tag findings with the repository's baseline (suppression) status."""
+        suppressions = {
+            row.fingerprint: row
+            for row in (
+                await self._session.scalars(
+                    select(Suppression).where(
+                        Suppression.repository_name == scan.repository_name
+                    )
+                )
+            ).all()
+        }
+        path_rows = (
+            await self._session.execute(
+                select(RepositoryFile.id, RepositoryFile.path).where(
+                    RepositoryFile.scan_id == scan.id
+                )
+            )
+        ).all()
+        path_by_file: dict[uuid.UUID, str] = {row[0]: row[1] for row in path_rows}
+        for finding in findings:
+            path = path_by_file.get(finding.file_id, "") if finding.file_id else ""
+            match = suppressions.get(
+                finding_fingerprint(finding.rule_id, path, finding.evidence)
+            )
+            finding.suppressed = match is not None  # type: ignore[attr-defined]
+            finding.suppression_reason = match.reason if match else None  # type: ignore[attr-defined]
+            finding.suppression_note = match.note if match else None  # type: ignore[attr-defined]
 
     async def get_file(self, scan_id: uuid.UUID, file_id: uuid.UUID) -> RepositoryFile:
         """Return a repository file (including its content), or raise NotFoundError."""
@@ -280,14 +331,17 @@ class ScanService:
         scores: list[int] = []
         readiness_by_scan: dict[uuid.UUID, int] = {}
         repositories_ready = 0
+        suppressed_by_repo: dict[str, set[str]] = {}
         for scan in completed:
+            if scan.repository_name not in suppressed_by_repo:
+                suppressed_by_repo[scan.repository_name] = await suppressed_fingerprints(
+                    self._session, scan.repository_name
+                )
+            suppressed = suppressed_by_repo[scan.repository_name]
             findings = [
                 self._finding_dict(f)
-                for f in (
-                    await self._session.scalars(
-                        select(Finding).where(Finding.scan_id == scan.id)
-                    )
-                ).all()
+                for (f, path) in await self._findings_with_paths(scan.id)
+                if finding_fingerprint(f.rule_id, path, f.evidence) not in suppressed
             ]
             files = [
                 {"file_type": ft}
@@ -439,16 +493,20 @@ class ScanService:
         return [(row[0], row[1]) for row in rows]
 
     async def _readiness_score(self, scan_id: uuid.UUID) -> int:
-        """Deterministic production-readiness score (0-100) for a scan."""
+        """Deterministic readiness score (0-100) for a scan, excluding suppressed
+        (baselined) findings so accepted risks do not count against it."""
         from agents.reasoning.readiness import assess
 
+        scan = await self._session.get(Scan, scan_id)
+        suppressed = (
+            await suppressed_fingerprints(self._session, scan.repository_name)
+            if scan
+            else set()
+        )
         findings = [
             self._finding_dict(f)
-            for f in (
-                await self._session.scalars(
-                    select(Finding).where(Finding.scan_id == scan_id)
-                )
-            ).all()
+            for (f, path) in await self._findings_with_paths(scan_id)
+            if finding_fingerprint(f.rule_id, path, f.evidence) not in suppressed
         ]
         files = [
             {"file_type": ft}
@@ -615,7 +673,43 @@ class ScanService:
             file_id = file_id_by_path.get(rule_finding.file_path)
             findings.append(self._to_finding(scan_id, file_id, rule_finding))
 
+        # Optional complementary AI review (gated on a configured LLM provider).
+        # Its findings augment - never replace - the deterministic ones above.
+        self._run_ai_review(repo_root, discovered_files, scan_id, file_id_by_path, findings)
+
         return findings
+
+    def _run_ai_review(
+        self,
+        repo_root: Path,
+        discovered_files: list[DiscoveredFile],
+        scan_id: uuid.UUID,
+        file_id_by_path: dict[str, uuid.UUID],
+        findings: list[Finding],
+    ) -> None:
+        """Append LLM-review findings, deduped against the deterministic ones."""
+        if not self._settings.ai_scan_enabled:
+            return
+        reviewer = AIReviewScanner(self._settings)
+        if not reviewer.available:
+            return
+
+        # Don't re-review 'other' files; focus on DevOps artifacts.
+        paths = [
+            f.path for f in discovered_files if f.category is not FileCategory.OTHER
+        ]
+        # (file_id, line) already reported by the rules - skip AI echoes of them.
+        occupied = {
+            (f.file_id, f.line_number) for f in findings if f.line_number is not None
+        }
+        for rule_finding in reviewer.analyze_repo(repo_root, paths):
+            file_id = file_id_by_path.get(rule_finding.file_path or "")
+            if (
+                rule_finding.line_number is not None
+                and (file_id, rule_finding.line_number) in occupied
+            ):
+                continue
+            findings.append(self._to_finding(scan_id, file_id, rule_finding))
 
     @staticmethod
     def _read_file_content(path: Path) -> str | None:
@@ -658,16 +752,18 @@ class ScanService:
 
     # -- ingestion -----------------------------------------------------------
 
-    async def ingest_zip_upload(
+    async def create_zip_scan(
         self,
         *,
         filename: str | None,
         upload_stream: BinaryIO,
-    ) -> tuple[Scan, int]:
-        """Ingest an uploaded ZIP archive and return the completed scan.
+    ) -> Scan:
+        """Create a PENDING ZIP scan and persist the upload into its workspace.
 
-        `upload_stream` is a synchronous binary stream (e.g. the UploadFile's
-        underlying spooled file). It is read in chunks with a hard size cap.
+        This is the request-side half of ingestion: it validates and stores the
+        upload but does NOT extract or scan it (that is `run_zip_pipeline`, which
+        may run in a worker). The workspace is intentionally left in place for the
+        pipeline to consume and clean up.
         """
         display_name = self._safe_display_name(filename)
         self._validate_extension(filename)
@@ -681,14 +777,32 @@ class ScanService:
         self._session.add(scan)
         await self._session.commit()
 
-        # Capture the id up front: after a failed flush the ORM instance's
-        # attributes are expired, and reading scan.id then would trigger a lazy
-        # load on a broken session (masking the real error).
         scan_id = scan.id
         workspace = self._workspaces.create(scan_id)
         try:
             self._save_upload(upload_stream, workspace.upload_path)
+        except AppError as exc:
+            self._workspaces.destroy(workspace)
+            await self._fail_scan(scan_id, exc.message)
+            raise
+        except Exception:
+            self._workspaces.destroy(workspace)
+            await self._fail_scan(scan_id, "Internal error saving upload.")
+            raise
+        return scan
 
+    async def run_zip_pipeline(self, scan_id: uuid.UUID) -> tuple[Scan, int]:
+        """Extract and scan a previously-created ZIP scan's upload.
+
+        Reads the upload saved by `create_zip_scan` from the (shared) workspace,
+        runs the full pipeline, and always removes the workspace afterwards. Safe
+        to run in a Celery worker.
+        """
+        scan = await self._session.get(Scan, scan_id)
+        if scan is None:
+            raise NotFoundError(f"Scan {scan_id} not found.")
+        workspace = self._workspaces.get(scan_id)
+        try:
             scan.status = ScanStatus.RUNNING
             scan.started_at = _utcnow()
             await self._session.commit()
@@ -707,22 +821,28 @@ class ScanService:
             await self._fail_scan(scan_id, "Internal error during ingestion.")
             raise
         finally:
-            # Always remove the extracted repository and raw upload.
             self._workspaces.destroy(workspace)
 
-    async def ingest_git_repo(
+    async def ingest_zip_upload(
+        self,
+        *,
+        filename: str | None,
+        upload_stream: BinaryIO,
+    ) -> tuple[Scan, int]:
+        """Synchronously ingest an uploaded ZIP: create the scan then run it."""
+        scan = await self.create_zip_scan(filename=filename, upload_stream=upload_stream)
+        return await self.run_zip_pipeline(scan.id)
+
+    async def create_git_scan(
         self,
         *,
         repository_url: str,
         ref: str | None = None,
-    ) -> tuple[Scan, int]:
-        """Clone a repository from a URL and run the full ingestion pipeline.
+    ) -> Scan:
+        """Validate a git URL and create a PENDING git scan (no clone yet).
 
-        Mirrors `ingest_zip_upload`, differing only in how the repository is
-        materialised into the isolated workspace: instead of extracting an
-        uploaded archive, a hardened shallow git clone populates the workspace.
-        The workspace is always removed afterwards and repository code is never
-        executed.
+        The clone and scan happen in `run_git_pipeline` (possibly on a worker),
+        which receives the URL/ref explicitly.
         """
         if not self._settings.git_ingestion_enabled:
             raise GitIngestionDisabledError("Git repository ingestion is disabled.")
@@ -741,8 +861,20 @@ class ScanService:
         )
         self._session.add(scan)
         await self._session.commit()
+        return scan
 
-        scan_id = scan.id
+    async def run_git_pipeline(
+        self, scan_id: uuid.UUID, repository_url: str, ref: str | None = None
+    ) -> tuple[Scan, int]:
+        """Clone a previously-created git scan's repository and run the pipeline.
+
+        A hardened shallow clone populates an isolated workspace, which is always
+        removed afterwards. Safe to run in a Celery worker; repository code is
+        never executed.
+        """
+        scan = await self._session.get(Scan, scan_id)
+        if scan is None:
+            raise NotFoundError(f"Scan {scan_id} not found.")
         workspace = self._workspaces.create(scan_id)
         try:
             scan.status = ScanStatus.RUNNING
@@ -765,8 +897,17 @@ class ScanService:
             await self._fail_scan(scan_id, "Internal error during ingestion.")
             raise
         finally:
-            # Always remove the cloned repository and its workspace.
             self._workspaces.destroy(workspace)
+
+    async def ingest_git_repo(
+        self,
+        *,
+        repository_url: str,
+        ref: str | None = None,
+    ) -> tuple[Scan, int]:
+        """Synchronously clone and scan a git repository: create then run."""
+        scan = await self.create_git_scan(repository_url=repository_url, ref=ref)
+        return await self.run_git_pipeline(scan.id, repository_url, ref)
 
     async def _process_repo(
         self, scan: Scan, scan_id: uuid.UUID, workspace: Workspace

@@ -21,6 +21,7 @@ from services.health_service import HealthService
 from services.remediation_service import RemediationService
 from services.report import ReportService
 from services.scan_service import ScanService
+from services.suppression_service import SuppressionService
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -83,3 +84,10 @@ def get_report_service(session: DbSessionDep, settings: SettingsDep) -> ReportSe
 
 
 ReportServiceDep = Annotated[ReportService, Depends(get_report_service)]
+
+
+def get_suppression_service(session: DbSessionDep) -> SuppressionService:
+    return SuppressionService(session=session)
+
+
+SuppressionServiceDep = Annotated[SuppressionService, Depends(get_suppression_service)]

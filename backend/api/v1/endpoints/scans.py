@@ -8,9 +8,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
+from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, File, Query, Response, UploadFile, status
+from fastapi import APIRouter, File, Query, Request, Response, UploadFile, status
+from starlette.responses import StreamingResponse
 
 from agents.reasoning import AuditReport, ReasoningService
 from api.dependencies import (
@@ -19,7 +22,10 @@ from api.dependencies import (
     ReportServiceDep,
     ScanServiceDep,
     SettingsDep,
+    SuppressionServiceDep,
 )
+from core.exceptions import NotFoundError
+from models.enums import ScanStatus
 from models.scan import Scan
 from models.schemas import (
     DiscoveryResponse,
@@ -34,10 +40,20 @@ from models.schemas import (
     ScanFilesResponse,
     ScanListResponse,
     ScanSummary,
+    SuppressionListResponse,
+    SuppressionRead,
+    SuppressRequest,
 )
 from services.report import ReportFormat
+from services.scan_service import ScanService
+from workers.tasks import run_git_scan, run_zip_scan
 
 router = APIRouter(prefix="/scans", tags=["scans"])
+
+# Server-sent-events tuning for the scan status stream.
+_STREAM_POLL_SECONDS = 1.0
+_STREAM_MAX_SECONDS = 900
+_TERMINAL_STATUSES = {ScanStatus.COMPLETED, ScanStatus.FAILED}
 
 
 def _to_summary(scan: Scan, file_count: int) -> ScanSummary:
@@ -62,8 +78,17 @@ def _to_summary(scan: Scan, file_count: int) -> ScanSummary:
 )
 async def upload_scan(
     service: ScanServiceDep,
+    settings: SettingsDep,
     file: UploadFile = File(..., description="A .zip archive of the repository."),
 ) -> ScanSummary:
+    if settings.scan_async:
+        # Persist the upload, return a PENDING scan, and process on the worker.
+        scan = await service.create_zip_scan(
+            filename=file.filename, upload_stream=file.file
+        )
+        run_zip_scan.delay(str(scan.id))
+        return _to_summary(scan, 0)
+
     scan, file_count = await service.ingest_zip_upload(
         filename=file.filename,
         upload_stream=file.file,
@@ -80,12 +105,20 @@ async def upload_scan(
 async def ingest_git_scan(
     request: GitScanRequest,
     service: ScanServiceDep,
+    settings: SettingsDep,
 ) -> ScanSummary:
     """Clone a repository from an http(s) git URL and run the full scan pipeline.
 
     The clone is shallow, single-branch and non-interactive; repository code is
     never executed and the working tree is discarded once analysis completes.
     """
+    if settings.scan_async:
+        scan = await service.create_git_scan(
+            repository_url=request.repository_url, ref=request.ref
+        )
+        run_git_scan.delay(str(scan.id), request.repository_url, request.ref)
+        return _to_summary(scan, 0)
+
     scan, file_count = await service.ingest_git_repo(
         repository_url=request.repository_url,
         ref=request.ref,
@@ -110,6 +143,55 @@ async def list_scans(
 async def get_scan(scan_id: uuid.UUID, service: ScanServiceDep) -> ScanSummary:
     scan, file_count = await service.get_scan(scan_id)
     return _to_summary(scan, file_count)
+
+
+@router.get(
+    "/{scan_id}/stream",
+    summary="Stream a scan's status until it reaches a terminal state (SSE)",
+)
+async def stream_scan(
+    scan_id: uuid.UUID,
+    request: Request,
+    service: ScanServiceDep,
+) -> StreamingResponse:
+    """Server-sent-events stream of a scan's status.
+
+    Emits a `ScanSummary` payload immediately and again on every change, closing
+    once the scan completes or fails. Lets the UI flip to results the moment a
+    worker finishes, rather than waiting for the next poll. Each poll uses a
+    short-lived session so it sees the worker's committed updates.
+    """
+    # 404 up front if the scan does not exist (before opening the stream).
+    await service.get_scan(scan_id)
+    database = request.app.state.database
+    settings = request.app.state.settings
+
+    async def events() -> AsyncIterator[str]:
+        last_payload: str | None = None
+        polls = int(_STREAM_MAX_SECONDS / _STREAM_POLL_SECONDS)
+        for _ in range(polls):
+            async with database.sessionmaker() as session:
+                scoped = ScanService(session=session, settings=settings)
+                try:
+                    scan, file_count = await scoped.get_scan(scan_id)
+                except NotFoundError:
+                    yield 'event: error\ndata: {"error": "scan not found"}\n\n'
+                    return
+                payload = _to_summary(scan, file_count).model_dump_json()
+                terminal = scan.status in _TERMINAL_STATUSES
+            if payload != last_payload:
+                last_payload = payload
+                yield f"data: {payload}\n\n"
+            if terminal:
+                return
+            await asyncio.sleep(_STREAM_POLL_SECONDS)
+        yield 'event: timeout\ndata: {}\n\n'
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get(
@@ -207,13 +289,14 @@ async def get_scan_report(
 
 @router.get(
     "/{scan_id}/report/export",
-    summary="Export the audit report as JSON, HTML, or PDF",
+    summary="Export the audit report as JSON, HTML, PDF, or SARIF",
     responses={
         200: {
             "content": {
                 "application/json": {},
                 "text/html": {},
                 "application/pdf": {},
+                "application/sarif+json": {},
             },
             "description": "The rendered report in the requested format.",
         }
@@ -223,7 +306,7 @@ async def export_scan_report(
     scan_id: uuid.UUID,
     service: ReportServiceDep,
     format: ReportFormat = Query(
-        ReportFormat.JSON, description="Export format: json, html, or pdf."
+        ReportFormat.JSON, description="Export format: json, html, pdf, or sarif."
     ),
     download: bool = Query(
         True, description="Send as a file download (Content-Disposition: attachment)."
@@ -257,8 +340,12 @@ async def get_scan_findings(
     confidence: str | None = Query(None, description="Filter by confidence."),
     file_id: uuid.UUID | None = Query(None, description="Filter by repository file id."),
     file_type: str | None = Query(None, description="Filter by file type."),
+    suppressed: bool | None = Query(
+        None,
+        description="Filter by baseline status: true = only suppressed, false = only active.",
+    ),
 ) -> FindingsResponse:
-    findings, severity_counts = await service.get_findings(
+    findings, severity_counts, suppressed_count = await service.get_findings(
         scan_id,
         severity=severity,
         category=category,
@@ -266,12 +353,67 @@ async def get_scan_findings(
         confidence=confidence,
         file_id=file_id,
         file_type=file_type,
+        suppressed=suppressed,
     )
     return FindingsResponse(
         scan_id=scan_id,
         total=len(findings),
         severity_counts=severity_counts,
+        suppressed_count=suppressed_count,
         items=[FindingRead.model_validate(f) for f in findings],
+    )
+
+
+@router.post(
+    "/{scan_id}/findings/{finding_id}/suppress",
+    response_model=SuppressionRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Suppress (baseline) a finding for its repository",
+)
+async def suppress_finding(
+    scan_id: uuid.UUID,
+    finding_id: uuid.UUID,
+    request: SuppressRequest,
+    service: SuppressionServiceDep,
+) -> SuppressionRead:
+    """Baseline a finding as false-positive / accepted-risk / won't-fix.
+
+    The decision is scoped to the repository and re-applied to future scans.
+    """
+    suppression = await service.suppress(
+        scan_id, finding_id, request.reason, request.note
+    )
+    return SuppressionRead.model_validate(suppression)
+
+
+@router.delete(
+    "/{scan_id}/findings/{finding_id}/suppress",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a finding's baseline (un-suppress)",
+)
+async def unsuppress_finding(
+    scan_id: uuid.UUID,
+    finding_id: uuid.UUID,
+    service: SuppressionServiceDep,
+) -> Response:
+    await service.unsuppress(scan_id, finding_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{scan_id}/suppressions",
+    response_model=SuppressionListResponse,
+    summary="List suppressions in effect for the scan's repository",
+)
+async def list_suppressions(
+    scan_id: uuid.UUID,
+    service: SuppressionServiceDep,
+) -> SuppressionListResponse:
+    scan, items = await service.list_for_scan(scan_id)
+    return SuppressionListResponse(
+        repository_name=scan.repository_name,
+        total=len(items),
+        items=[SuppressionRead.model_validate(s) for s in items],
     )
 
 

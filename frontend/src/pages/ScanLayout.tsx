@@ -3,7 +3,7 @@ import { NavLink, Outlet, useParams } from "react-router-dom";
 import { ReportExportMenu } from "@/components/ReportExportMenu";
 import { ScanStatusBadge } from "@/components/ScanStatusBadge";
 import { Spinner } from "@/components/ui";
-import { useReport, useScan } from "@/hooks/useScans";
+import { useReport, useScan, useScanStream } from "@/hooks/useScans";
 import { prettyLabel, relativeTime } from "@/lib/format";
 
 const TABS = [
@@ -27,6 +27,8 @@ function Meta({ label, value, mono }: { label: string; value: string; mono?: boo
 export default function ScanLayout() {
   const { scanId } = useParams();
   const { data: scan, isLoading } = useScan(scanId ?? null);
+  // Push live status updates while the scan is running (falls back to polling).
+  useScanStream(scanId ?? null, scan?.status);
   const isDone = scan?.status === "completed";
   const { data: report } = useReport(isDone ? (scanId ?? null) : null);
 

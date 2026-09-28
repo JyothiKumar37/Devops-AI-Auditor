@@ -87,8 +87,16 @@ class Settings(BaseSettings):
     max_uncompressed_size_mb: int = 1024
     max_compression_ratio: int = 200
     # Root directory for isolated, per-scan extraction workspaces. Empty means a
-    # dedicated subdirectory under the system temp directory is used.
+    # dedicated subdirectory under the system temp directory is used. When async
+    # scanning is enabled this MUST be a filesystem shared by the API and the
+    # Celery worker (compose mounts a shared volume for it).
     workspace_root: str = ""
+
+    # Run scans off the request path via the Celery worker. When enabled, upload
+    # and git-clone endpoints create a PENDING scan, enqueue the work, and return
+    # immediately; the worker executes the pipeline. Off by default so a single
+    # process (and the test suite) run scans synchronously.
+    scan_async: bool = False
 
     # ---- Ingestion / git ----
     # Enable cloning repositories directly from a URL (POST /scans/git).
@@ -127,7 +135,7 @@ class Settings(BaseSettings):
     secrets_scan_history: bool = False
 
     # ---- AI reasoning layer (LLM) ----
-    # Provider: "none" (deterministic fallback), "openai", or "anthropic".
+    # Provider: "none" (deterministic fallback), "openai", "anthropic", or "gemini".
     llm_provider: str = "none"
     llm_model: str = "gpt-4o-mini"
     llm_api_key: str = Field(default="", repr=False)
@@ -135,6 +143,18 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_max_retries: int = 2
     llm_timeout: int = 60
+    # ---- AI review scan ----
+    # A complementary LLM pass that finds issues the deterministic rules may miss.
+    # Off by default and requires a configured LLM provider. Its findings are
+    # marked scanner="ai-review", confidence-capped, deduped against rule findings
+    # and never auto-remediated (guidance only) - the rule engine stays the
+    # reproducible source of truth.
+    ai_scan_enabled: bool = False
+    # Upper bound on files sent to the model per scan (cost/latency control).
+    ai_scan_max_files: int = 25
+    # Per-file character cap sent to the model.
+    ai_scan_max_file_bytes: int = 8000
+
     # Timeout (seconds) for any external scanner invocation.
     external_tool_timeout: int = 120
 

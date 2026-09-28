@@ -60,6 +60,15 @@ class WorkspaceManager:
         logger.info("workspace_created", scan_id=str(scan_id), root=str(root))
         return Workspace(scan_id=scan_id, root=root)
 
+    def get(self, scan_id: uuid.UUID) -> Workspace:
+        """Return the (already-created) workspace for a scan without creating it.
+
+        Used by the worker to reconstruct the deterministic workspace path that
+        the API created when it saved the upload, so async processing reads the
+        same directory.
+        """
+        return Workspace(scan_id=scan_id, root=self._base / str(scan_id))
+
     def destroy(self, workspace: Workspace) -> None:
         """Remove a workspace and all of its contents. Never raises."""
         try:

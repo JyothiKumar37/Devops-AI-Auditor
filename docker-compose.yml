@@ -61,8 +61,20 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      # Run scans on the Celery worker. The workspace root is a shared volume so
+      # the worker can read the upload the API saved.
+      SCAN_ASYNC: ${SCAN_ASYNC:-true}
+      WORKSPACE_ROOT: /workspaces
+      # AI reasoning + AI review scan (see .env).
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./data/workspaces:/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,7 +98,20 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-auditor}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Same shared workspace volume as the backend, so the worker reads the
+      # upload the API persisted for the scan it processes.
+      WORKSPACE_ROOT: /workspaces
+      # The AI review scan runs here in async mode, so the worker needs the LLM config.
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
+    volumes:
+      - ./data/workspaces:/workspaces
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
 

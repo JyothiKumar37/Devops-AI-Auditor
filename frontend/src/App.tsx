@@ -1,5 +1,6 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
 import Dashboard from "@/pages/Dashboard";
 import FindingDetails from "@/pages/FindingDetails";
@@ -15,8 +16,10 @@ import ScanOverview from "@/pages/ScanOverview";
 import Settings from "@/pages/Settings";
 
 export default function App() {
+  const location = useLocation();
   return (
     <AppShell>
+      <ErrorBoundary resetKey={location.pathname}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/scan/new" element={<NewScan />} />
@@ -33,6 +36,7 @@ export default function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ErrorBoundary>
     </AppShell>
   );
 }

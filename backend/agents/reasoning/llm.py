@@ -133,6 +133,63 @@ class AnthropicProvider(LLMProvider):
         return response.json()["content"][0]["text"]
 
 
+class GeminiProvider(LLMProvider):
+    """Google Gemini via the Generative Language REST API.
+
+    Uses a system instruction plus user turns and requests JSON output. The
+    configured model is coerced to a Gemini model name so a stale default (e.g.
+    an OpenAI model) does not produce an invalid request.
+    """
+
+    name = "gemini"
+
+    def __init__(self, api_key: str, model: str, base_url: str = "", timeout: int = 60) -> None:
+        self._api_key = api_key
+        self._model = model if model.startswith("gemini") else "gemini-3.8-flash"
+        self._base_url = (
+            base_url or "https://generativelanguage.googleapis.com/v1beta"
+        ).rstrip("/")
+        self._timeout = timeout
+
+    @property
+    def available(self) -> bool:
+        return bool(self._api_key)
+
+    def complete(self, messages: list[LLMMessage], *, temperature: float = 0.0) -> str:
+        system = "\n".join(m.content for m in messages if m.role == "system")
+        contents = [
+            {
+                # Gemini uses "model" for the assistant role.
+                "role": "model" if m.role == "assistant" else "user",
+                "parts": [{"text": m.content}],
+            }
+            for m in messages
+            if m.role != "system"
+        ]
+        body: dict[str, object] = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "responseMimeType": "application/json",
+            },
+        }
+        if system:
+            body["systemInstruction"] = {"parts": [{"text": system}]}
+
+        response = httpx.post(
+            f"{self._base_url}/models/{self._model}:generateContent",
+            headers={"x-goog-api-key": self._api_key},
+            json=body,
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+        candidates = response.json().get("candidates") or []
+        if not candidates:
+            return ""  # e.g. blocked by a safety filter; treated as no output
+        parts = candidates[0].get("content", {}).get("parts") or []
+        return "".join(part.get("text", "") for part in parts)
+
+
 def _safe_base_url(base_url: str) -> str:
     """Only accept an http(s) base URL; ignore anything else (SSRF hygiene).
 
@@ -157,6 +214,10 @@ def get_provider(settings: Settings) -> LLMProvider:
         )
     if provider == "anthropic" and settings.llm_api_key:
         return AnthropicProvider(
+            settings.llm_api_key, settings.llm_model, base_url, settings.llm_timeout
+        )
+    if provider == "gemini" and settings.llm_api_key:
+        return GeminiProvider(
             settings.llm_api_key, settings.llm_model, base_url, settings.llm_timeout
         )
     return NullLLMProvider()

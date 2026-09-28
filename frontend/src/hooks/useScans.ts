@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { api } from "@/lib/api";
 import type {
@@ -16,6 +17,8 @@ import type {
   ScanListResponse,
   ScanSummary,
   StatsResponse,
+  SuppressionRead,
+  SuppressRequest,
 } from "@/types/api";
 
 export function useStats() {
@@ -50,6 +53,45 @@ export function useDiscovery(scanId: string | null) {
     queryFn: () => api.getDiscovery(scanId as string),
     enabled: Boolean(scanId),
   });
+}
+
+/**
+ * Live scan status via server-sent events. While a scan is not terminal this
+ * opens an EventSource, pushes each status update straight into the scan query
+ * cache, and - the moment the scan completes or fails - invalidates the derived
+ * queries so results appear immediately (instead of waiting for the next poll).
+ */
+export function useScanStream(scanId: string | null, status?: string) {
+  const queryClient = useQueryClient();
+  const done = status === "completed" || status === "failed";
+  useEffect(() => {
+    if (!scanId || done) return;
+    const source = new EventSource(api.scanStreamUrl(scanId));
+    source.onmessage = (event) => {
+      let summary: ScanSummary;
+      try {
+        summary = JSON.parse(event.data) as ScanSummary;
+      } catch {
+        return; // ignore malformed / non-data frames
+      }
+      queryClient.setQueryData(["scan", scanId], summary);
+      if (summary.status === "completed" || summary.status === "failed") {
+        for (const key of [
+          ["findings", scanId],
+          ["report", scanId],
+          ["discovery", scanId],
+          ["files", scanId],
+          ["diff", scanId],
+          ["stats"],
+        ]) {
+          void queryClient.invalidateQueries({ queryKey: key });
+        }
+        source.close();
+      }
+    };
+    source.onerror = () => source.close(); // fall back to polling
+    return () => source.close();
+  }, [scanId, done, queryClient]);
 }
 
 export function useScanDiff(scanId: string | null, base?: string) {
@@ -122,6 +164,35 @@ export function useApplyRemediation(scanId: string, findingId: string) {
       void queryClient.invalidateQueries({ queryKey: ["findings", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["file-content", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["files", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["report", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+/** Suppress (baseline) a finding, then refresh findings/report/stats. */
+export function useSuppressFinding(scanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<SuppressionRead, Error, { findingId: string } & SuppressRequest>({
+    mutationFn: ({ findingId, ...payload }) =>
+      api.suppressFinding(scanId, findingId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["findings", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["suppressions", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["report", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+/** Remove a finding's baseline, then refresh findings/report/stats. */
+export function useUnsuppressFinding(scanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, string>({
+    mutationFn: (findingId: string) => api.unsuppressFinding(scanId, findingId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["findings", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["suppressions", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["report", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["stats"] });
     },

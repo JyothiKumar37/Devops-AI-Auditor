@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { Card, EmptyState, Field, SeverityPill, Spinner } from "@/components/ui";
+import { Badge, Card, EmptyState, Field, SeverityPill, Spinner } from "@/components/ui";
 import { useFindings, useScanFiles } from "@/hooks/useScans";
 import { SEVERITY_ORDER, prettyLabel, severityMeta } from "@/lib/format";
 import type { Finding } from "@/types/api";
@@ -44,6 +44,8 @@ export default function Findings() {
   const [confidence, setConfidence] = useState("");
   const [fileType, setFileType] = useState("");
   const [search, setSearch] = useState("");
+  // Suppressed (baselined) findings are hidden by default to declutter the list.
+  const [showSuppressed, setShowSuppressed] = useState(false);
 
   const fileById = useMemo(() => {
     const map = new Map<string, { path: string; file_type: string }>();
@@ -72,6 +74,7 @@ export default function Findings() {
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return items.filter((f) => {
+      if (!showSuppressed && f.suppressed) return false;
       if (severity && f.severity !== severity) return false;
       if (category && f.category !== category) return false;
       if (scanner && f.scanner !== scanner) return false;
@@ -84,7 +87,7 @@ export default function Findings() {
       }
       return true;
     });
-  }, [items, severity, category, scanner, confidence, fileType, search, fileById]);
+  }, [items, severity, category, scanner, confidence, fileType, search, showSuppressed, fileById]);
 
   const activeFilters =
     Boolean(severity || category || scanner || confidence || fileType || search.trim());
@@ -122,6 +125,19 @@ export default function Findings() {
             </button>
           );
         })}
+        {data && data.suppressed_count > 0 ? (
+          <button
+            type="button"
+            onClick={() => setShowSuppressed((v) => !v)}
+            className={`chip ml-auto transition-colors ${
+              showSuppressed
+                ? "bg-slate-900 text-white ring-slate-900"
+                : "bg-white text-slate-600 ring-slate-300 hover:bg-slate-50"
+            }`}
+          >
+            {showSuppressed ? "Hide" : "Show"} {data.suppressed_count} suppressed
+          </button>
+        ) : null}
       </Card>
 
       <Card className="p-4">
@@ -196,17 +212,34 @@ export default function Findings() {
               {filtered.map((f) => {
                 const meta = fileById.get(f.file_id ?? "");
                 return (
-                  <tr key={f.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/70">
+                  <tr
+                    key={f.id}
+                    className={`border-b border-slate-100 last:border-0 hover:bg-slate-50/70 ${
+                      f.suppressed ? "opacity-55" : ""
+                    }`}
+                  >
                     <td className="px-5 py-3">
                       <SeverityPill severity={f.severity} />
                     </td>
                     <td className="px-5 py-3">
-                      <Link
-                        to={`/scans/${id}/findings/${f.id}`}
-                        className="font-medium text-slate-900 hover:text-brand"
-                      >
-                        {f.title}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          to={`/scans/${id}/findings/${f.id}`}
+                          className="font-medium text-slate-900 hover:text-brand"
+                        >
+                          {f.title}
+                        </Link>
+                        {f.scanner === "ai-review" ? (
+                          <Badge className="bg-violet-100 text-violet-700 ring-violet-200">
+                            AI
+                          </Badge>
+                        ) : null}
+                        {f.suppressed ? (
+                          <Badge className="bg-slate-200 text-slate-600 ring-slate-300">
+                            Suppressed
+                          </Badge>
+                        ) : null}
+                      </div>
                       <p className="text-xs text-slate-500">
                         {f.rule_id} · {prettyLabel(f.category)}
                       </p>

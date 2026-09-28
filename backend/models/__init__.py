@@ -8,9 +8,11 @@ from models.enums import (
     ScanStatus,
     Severity,
     SourceType,
+    SuppressionReason,
 )
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
+from models.suppression import Suppression
 
 __all__ = [
     "Base",
@@ -23,4 +25,6 @@ __all__ = [
     "ScanStatus",
     "Severity",
     "SourceType",
+    "Suppression",
+    "SuppressionReason",
 ]
