@@ -8,7 +8,11 @@ FROM python:3.11-slim AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Tolerate slow/flaky networks reaching PyPI during the build (the default
+    # 15s timeout / 5 retries is too aggressive behind slow links or a proxy).
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
 WORKDIR /app
 
 # ---- Builder: install the project and its dependencies ----
