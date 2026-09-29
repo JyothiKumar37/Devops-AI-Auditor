@@ -143,6 +143,14 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_max_retries: int = 2
     llm_timeout: int = 60
+    # Use the LLM inside the /report reasoning graph. OFF by default: the report
+    # is the authoritative, deterministic view and must render instantly. When a
+    # provider is configured this would otherwise fire many sequential LLM calls
+    # (one per finding/domain) on every report load, stalling the Overview and
+    # risking rate limits. On-demand AI value lives in the AI-assist endpoints
+    # (summary, prioritize, chat) instead. Enable only if you want LLM-authored
+    # reasoning baked into the report and accept the added latency.
+    ai_report_enabled: bool = False
     # ---- AI review scan ----
     # A complementary LLM pass that finds issues the deterministic rules may miss.
     # Off by default and requires a configured LLM provider. Its findings are

@@ -80,7 +80,15 @@ class ReasoningService:
         findings = [self._normalize(f, path_by_id) for f in active_rows]
         relationships = [f for f in findings if f["rule_id"] in _RELATIONSHIP_RULES]
 
-        provider = get_provider(await resolve_settings(self._session, self._settings))
+        # The report is deterministic and fast by default. LLM reasoning fires
+        # one call per finding/domain and would stall every report load (and hit
+        # rate limits) when a provider is configured, so it is opt-in via
+        # AI_REPORT_ENABLED. When off we hand the graph a Null provider so it
+        # takes the deterministic path regardless of the configured provider.
+        resolved = await resolve_settings(self._session, self._settings)
+        if not resolved.ai_report_enabled:
+            resolved = resolved.model_copy(update={"llm_provider": "none"})
+        provider = get_provider(resolved)
         graph = build_reasoning_graph(provider)
         initial: dict[str, Any] = {
             "scan_id": str(scan_id),

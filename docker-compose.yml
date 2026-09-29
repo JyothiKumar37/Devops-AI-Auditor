@@ -71,6 +71,9 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
+      # LLM reasoning inside /report. Off by default so the report/Overview
+      # render instantly and deterministically (AI value is on-demand elsewhere).
+      AI_REPORT_ENABLED: ${AI_REPORT_ENABLED:-false}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -107,6 +110,7 @@ services:
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
+      AI_REPORT_ENABLED: ${AI_REPORT_ENABLED:-false}
     volumes:
       - workspaces:/workspaces
     depends_on:
