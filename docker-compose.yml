@@ -74,7 +74,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - ./data/workspaces:/workspaces
+      - workspaces:/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -108,7 +108,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
     volumes:
-      - ./data/workspaces:/workspaces
+      - workspaces:/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,6 +129,9 @@ services:
     depends_on:
       - backend
 
-# Data is persisted via host bind mounts under ./data (see the postgres and
-# redis services), so no named volumes are declared here — nothing to be
-# removed by `docker compose down -v`.
+# Postgres/Redis data are persisted via host bind mounts under ./data. The scan
+# workspace is a named volume (shared by backend + worker) so it inherits the
+# image's app-user ownership and stays writable by the non-root process; its
+# contents are ephemeral (each scan cleans up after itself).
+volumes:
+  workspaces:

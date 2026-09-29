@@ -38,6 +38,11 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Run as an unprivileged user.
 RUN groupadd --system app && useradd --system --gid app --home /app app
 
+# The scan workspace is a (named) volume shared with the worker. Create it owned
+# by the app user in the image so the volume inherits writable ownership on first
+# use - otherwise the non-root process cannot write uploads into it.
+RUN mkdir -p /workspaces && chown app:app /workspaces
+
 COPY backend/ /app/
 RUN chown -R app:app /app
 USER app
