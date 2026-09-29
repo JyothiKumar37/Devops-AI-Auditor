@@ -14,6 +14,11 @@ from enum import Enum
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.ai_assist import (
+    AiAssistService,
+    LLMRequestFailedError,
+    LLMUnavailableError,
+)
 from agents.reasoning import ReasoningService
 from core.config import Settings
 from core.exceptions import NotFoundError
@@ -64,8 +69,15 @@ class ReportService:
         self._session = session
         self._settings = settings
 
-    async def build_model(self, scan_id: uuid.UUID) -> ReportModel:
-        """Load the scan's data and assemble the stable report model."""
+    async def build_model(
+        self, scan_id: uuid.UUID, *, include_ai: bool = False
+    ) -> ReportModel:
+        """Load the scan's data and assemble the stable report model.
+
+        When `include_ai` is set and an LLM provider is configured, a best-effort
+        AI executive summary is attached; any failure leaves it unset rather than
+        breaking the export.
+        """
         scan = await self._session.get(Scan, scan_id)
         if scan is None:
             raise NotFoundError(f"Scan {scan_id} not found.")
@@ -103,13 +115,27 @@ class ReportService:
             session=self._session, settings=self._settings
         ).generate_report(scan_id)
 
-        return build_report_model(scan, findings_rows, path_by_id, files, audit_report)
+        model = build_report_model(scan, findings_rows, path_by_id, files, audit_report)
+        if include_ai:
+            model.ai_summary = await self._ai_summary(scan_id)
+        return model
+
+    async def _ai_summary(self, scan_id: uuid.UUID) -> str | None:
+        """Best-effort AI executive summary; None if unavailable or it fails."""
+        try:
+            return await AiAssistService(
+                self._session, self._settings
+            ).summarize_scan(scan_id)
+        except (LLMUnavailableError, LLMRequestFailedError):
+            return None
+        except Exception:  # noqa: BLE001 - never break an export on AI failure
+            return None
 
     async def render(
-        self, scan_id: uuid.UUID, fmt: ReportFormat
+        self, scan_id: uuid.UUID, fmt: ReportFormat, *, include_ai: bool = False
     ) -> tuple[bytes, str, str]:
         """Return (content_bytes, media_type, filename) for the requested format."""
-        model = await self.build_model(scan_id)
+        model = await self.build_model(scan_id, include_ai=include_ai)
         if fmt is ReportFormat.JSON:
             content = render_json(model)
         elif fmt is ReportFormat.HTML:

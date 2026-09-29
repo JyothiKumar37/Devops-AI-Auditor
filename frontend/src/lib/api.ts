@@ -9,8 +9,16 @@ import type {
   FindingFilters,
   FindingsResponse,
   GitScanRequest,
+  AiAnswer,
+  AiExplanation,
+  AiFixSuggestion,
+  AiPriorities,
+  AiScanSummary,
+  AiTriage,
+  ChatHistory,
   HealthResponse,
   LLMHealth,
+  LLMSettings,
   RemediationProposal,
   RemediationResult,
   ReportModel,
@@ -68,9 +76,9 @@ async function post<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function postJson<T>(path: string, payload: unknown): Promise<T> {
+async function sendJson<T>(method: "POST" | "PUT", path: string, payload: unknown): Promise<T> {
   const response = await fetch(path, {
-    method: "POST",
+    method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(payload),
   });
@@ -83,6 +91,14 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
     );
   }
   return (await response.json()) as T;
+}
+
+function postJson<T>(path: string, payload: unknown): Promise<T> {
+  return sendJson<T>("POST", path, payload);
+}
+
+function putJson<T>(path: string, payload: unknown): Promise<T> {
+  return sendJson<T>("PUT", path, payload);
 }
 
 async function del(path: string): Promise<void> {
@@ -155,6 +171,38 @@ export const api = {
   getHealth: () => request<HealthResponse>(`${API_V1}/health/ready`),
   /** On-demand LLM connectivity check (provider reachable + model valid). */
   getLLMHealth: () => request<LLMHealth>(`${API_V1}/health/llm`),
+  /** Current effective LLM configuration (env default + any runtime override). */
+  getLLMSettings: () => request<LLMSettings>(`${API_V1}/settings/llm`),
+  /** Switch the LLM model at runtime; empty string reverts to the env default. */
+  updateLLMModel: (model: string) =>
+    putJson<LLMSettings>(`${API_V1}/settings/llm`, { model }),
+
+  // ---- interactive AI assistance ----
+  /** AI explanation of a finding (impact + fix). */
+  explainFinding: (scanId: string, findingId: string) =>
+    post<AiExplanation>(`${API_V1}/scans/${scanId}/findings/${findingId}/explain`),
+  /** AI-proposed fix for a finding (review-only). */
+  suggestFix: (scanId: string, findingId: string) =>
+    post<AiFixSuggestion>(`${API_V1}/scans/${scanId}/findings/${findingId}/fix-suggestion`),
+  /** AI false-positive triage of a finding. */
+  triageFinding: (scanId: string, findingId: string) =>
+    post<AiTriage>(`${API_V1}/scans/${scanId}/findings/${findingId}/triage`),
+  /** AI executive summary of a scan. */
+  getAiSummary: (scanId: string) =>
+    request<AiScanSummary>(`${API_V1}/scans/${scanId}/ai-summary`),
+  /** AI context-aware risk ranking of a scan's findings. */
+  getPriorities: (scanId: string) =>
+    request<AiPriorities>(`${API_V1}/scans/${scanId}/priorities`),
+  /** Ask a question grounded in a scan's findings. */
+  askScan: (scanId: string, question: string) =>
+    postJson<AiAnswer>(`${API_V1}/scans/${scanId}/ask`, { question }),
+  /** Get the scan's persistent AI chat history. */
+  getChat: (scanId: string) => request<ChatHistory>(`${API_V1}/scans/${scanId}/chat`),
+  /** Post a question to the scan's persistent chat; returns the updated history. */
+  postChat: (scanId: string, question: string) =>
+    postJson<ChatHistory>(`${API_V1}/scans/${scanId}/chat`, { question }),
+  /** Clear the scan's chat history. */
+  clearChat: (scanId: string) => del(`${API_V1}/scans/${scanId}/chat`),
   /** Aggregate dashboard metrics. */
   getStats: () => request<StatsResponse>(`${API_V1}/stats`),
   /** List scans, most recent first. */
@@ -183,8 +231,13 @@ export const api = {
   /** Fetch the AI reasoning report (production readiness, groups, recommendations). */
   getReport: (id: string) => request<AuditReport>(`${API_V1}/scans/${id}/report`),
   /** URL that exports the full audit report in the given format (json|html|pdf). */
-  reportExportUrl: (id: string, format: "json" | "html" | "pdf" | "sarif", download = true) =>
-    `${API_V1}/scans/${id}/report/export?format=${format}&download=${download}`,
+  reportExportUrl: (
+    id: string,
+    format: "json" | "html" | "pdf" | "sarif",
+    opts: { download?: boolean; ai?: boolean } = {},
+  ) =>
+    `${API_V1}/scans/${id}/report/export?format=${format}` +
+    `&download=${opts.download ?? true}&ai=${opts.ai ?? false}`,
   /** Fetch the full structured report model for in-app viewing. */
   getReportModel: (id: string) =>
     request<ReportModel>(`${API_V1}/scans/${id}/report/export?format=json&download=false`),

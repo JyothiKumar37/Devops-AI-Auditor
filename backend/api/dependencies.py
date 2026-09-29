@@ -14,6 +14,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agents.ai_assist import AiAssistService
 from core.config import Settings
 from core.database import Database
 from core.redis import RedisClient
@@ -91,3 +92,10 @@ def get_suppression_service(session: DbSessionDep) -> SuppressionService:
 
 
 SuppressionServiceDep = Annotated[SuppressionService, Depends(get_suppression_service)]
+
+
+def get_ai_assist_service(session: DbSessionDep, settings: SettingsDep) -> AiAssistService:
+    return AiAssistService(session=session, settings=settings)
+
+
+AiAssistServiceDep = Annotated[AiAssistService, Depends(get_ai_assist_service)]

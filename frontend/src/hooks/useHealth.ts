@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "@/lib/api";
-import type { HealthResponse, LLMHealth } from "@/types/api";
+import type { HealthResponse, LLMHealth, LLMSettings } from "@/types/api";
 
 // Polls backend readiness so the dashboard reflects live dependency status.
 export function useHealth() {
@@ -21,5 +21,23 @@ export function useLLMHealth(enabled: boolean) {
     enabled,
     staleTime: 30_000,
     retry: false,
+  });
+}
+
+// Current effective LLM config (env default + any runtime model override).
+export function useLLMSettings() {
+  return useQuery<LLMSettings>({ queryKey: ["llm-settings"], queryFn: api.getLLMSettings });
+}
+
+// Switch the active LLM model at runtime (empty string reverts to the env default).
+export function useUpdateLLMModel() {
+  const queryClient = useQueryClient();
+  return useMutation<LLMSettings, Error, string>({
+    mutationFn: (model: string) => api.updateLLMModel(model),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["llm-settings"], data);
+      // The connection check should be re-run against the new model.
+      void queryClient.invalidateQueries({ queryKey: ["llm-health"] });
+    },
   });
 }

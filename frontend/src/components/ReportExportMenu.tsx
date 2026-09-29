@@ -2,6 +2,7 @@
 // PDF / HTML / JSON. Downloads link directly to the backend export endpoint,
 // which responds with a Content-Disposition attachment.
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api";
@@ -22,6 +23,7 @@ export function ReportExportMenu({
   scanId: string;
   disabled?: boolean;
 }) {
+  const [withAi, setWithAi] = useState(false);
   if (disabled) {
     return (
       <span className="text-xs font-medium text-slate-400">Report available once scan completes</span>
@@ -29,6 +31,18 @@ export function ReportExportMenu({
   }
   return (
     <div className="flex items-center gap-2">
+      <label
+        className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600"
+        title="Include an AI-generated executive summary in the export (requires a configured LLM)"
+      >
+        <input
+          type="checkbox"
+          checked={withAi}
+          onChange={(e) => setWithAi(e.target.checked)}
+          className="h-3.5 w-3.5 rounded border-slate-300"
+        />
+        AI summary
+      </label>
       <Link
         to={`/scans/${scanId}/report`}
         className="btn-primary px-3 py-1.5 text-xs"
@@ -47,7 +61,7 @@ export function ReportExportMenu({
         {FORMATS.map(({ format, label, title }, index) => (
           <a
             key={format}
-            href={api.reportExportUrl(scanId, format)}
+            href={api.reportExportUrl(scanId, format, { ai: withAi })}
             title={title}
             className={`px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 ${
               index > 0 ? "border-l border-slate-200" : ""

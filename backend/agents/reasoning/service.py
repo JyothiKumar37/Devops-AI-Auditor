@@ -21,6 +21,7 @@ from core.logging import get_logger
 from models.finding import Finding
 from models.scan import RepositoryFile, Scan
 from services.fingerprint import finding_fingerprint
+from services.runtime_config import resolve_settings
 from services.suppression_service import suppressed_fingerprints
 
 logger = get_logger(__name__)
@@ -79,7 +80,7 @@ class ReasoningService:
         findings = [self._normalize(f, path_by_id) for f in active_rows]
         relationships = [f for f in findings if f["rule_id"] in _RELATIONSHIP_RULES]
 
-        provider = get_provider(self._settings)
+        provider = get_provider(await resolve_settings(self._session, self._settings))
         graph = build_reasoning_graph(provider)
         initial: dict[str, Any] = {
             "scan_id": str(scan_id),

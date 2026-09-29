@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response, status
 
-from api.dependencies import HealthServiceDep, SettingsDep
+from api.dependencies import DbSessionDep, HealthServiceDep, SettingsDep
 from models.schemas import (
     HealthResponse,
     HealthState,
@@ -50,7 +50,7 @@ async def readiness(
 
 
 @router.get("/llm", response_model=LLMHealthResponse, summary="LLM connectivity check")
-async def llm_health(settings: SettingsDep) -> LLMHealthResponse:
+async def llm_health(settings: SettingsDep, session: DbSessionDep) -> LLMHealthResponse:
     """Verify the configured LLM provider is reachable and the model is valid.
 
     Makes a tiny live completion call (so it does consume a token or two). Always
@@ -61,7 +61,9 @@ async def llm_health(settings: SettingsDep) -> LLMHealthResponse:
     import time
 
     from agents.reasoning.llm import LLMMessage, get_provider
+    from services.runtime_config import resolve_settings
 
+    settings = await resolve_settings(session, settings)
     provider = get_provider(settings)
     if not provider.available:
         return LLMHealthResponse(

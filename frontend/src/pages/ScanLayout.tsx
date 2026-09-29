@@ -12,6 +12,7 @@ const TABS = [
   { to: "files", label: "Files", key: "files" as const },
   { to: "readiness", label: "Readiness", key: "readiness" as const },
   { to: "diff", label: "Diff", key: "diff" as const },
+  { to: "chat", label: "Ask AI", key: "chat" as const },
   { to: "report", label: "Report", key: "report" as const },
 ];
 

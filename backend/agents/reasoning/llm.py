@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TypeVar
@@ -143,6 +144,13 @@ class GeminiProvider(LLMProvider):
 
     name = "gemini"
 
+    # Gemini flash models are frequently rate-limited/overloaded (429/503); a few
+    # backoff retries turn those transient spikes into successful calls instead of
+    # silently dropping the whole request.
+    _MAX_ATTEMPTS = 3
+    _BACKOFF_SECONDS = 2.0
+    _RETRYABLE_STATUS = {429, 500, 503}
+
     def __init__(self, api_key: str, model: str, base_url: str = "", timeout: int = 60) -> None:
         self._api_key = api_key
         self._model = model if model.startswith("gemini") else "gemini-3.8-flash"
@@ -176,18 +184,35 @@ class GeminiProvider(LLMProvider):
         if system:
             body["systemInstruction"] = {"parts": [{"text": system}]}
 
-        response = httpx.post(
-            f"{self._base_url}/models/{self._model}:generateContent",
-            headers={"x-goog-api-key": self._api_key},
-            json=body,
-            timeout=self._timeout,
-        )
+        url = f"{self._base_url}/models/{self._model}:generateContent"
+        headers = {"x-goog-api-key": self._api_key}
+        response: httpx.Response | None = None
+        for attempt in range(self._MAX_ATTEMPTS):
+            response = httpx.post(url, headers=headers, json=body, timeout=self._timeout)
+            if (
+                response.status_code in self._RETRYABLE_STATUS
+                and attempt < self._MAX_ATTEMPTS - 1
+            ):
+                logger.warning(
+                    "gemini_retry", status=response.status_code, attempt=attempt
+                )
+                time.sleep(self._BACKOFF_SECONDS * (attempt + 1))
+                continue
+            break
+        if response is None:  # pragma: no cover - _MAX_ATTEMPTS is always >= 1
+            return ""
         response.raise_for_status()
+
         candidates = response.json().get("candidates") or []
         if not candidates:
             return ""  # e.g. blocked by a safety filter; treated as no output
         parts = candidates[0].get("content", {}).get("parts") or []
-        return "".join(part.get("text", "") for part in parts)
+        # Skip the model's internal "thought" parts (thinking models such as the
+        # flash line) so only the answer text is returned - otherwise reasoning
+        # text is concatenated ahead of the JSON and breaks parsing.
+        return "".join(
+            part.get("text", "") for part in parts if not part.get("thought")
+        )
 
 
 def _safe_base_url(base_url: str) -> str:

@@ -60,6 +60,66 @@ export interface LLMHealth {
   latency_ms: number | null;
 }
 
+export interface LLMSettings {
+  provider: string;
+  model: string;
+  env_model: string;
+  overridden: boolean;
+  configured: boolean;
+}
+
+export interface AiExplanation {
+  explanation: string;
+}
+
+export interface AiFixSuggestion {
+  file_path: string | null;
+  before: string;
+  after: string;
+  diff: string;
+  explanation: string;
+  changed: boolean;
+}
+
+export interface AiTriage {
+  likely_false_positive: boolean;
+  confidence: string;
+  reason: string;
+}
+
+export interface AiScanSummary {
+  summary: string;
+}
+
+export interface AiPriorityItem {
+  finding_id: string;
+  rule_id: string;
+  severity: string;
+  title: string;
+  file: string | null;
+  rationale: string;
+}
+
+export interface AiPriorities {
+  items: AiPriorityItem[];
+}
+
+export interface AiAnswer {
+  answer: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface ChatHistory {
+  scan_id: string;
+  messages: ChatMessage[];
+}
+
 export interface ScanDiffFinding {
   rule_id: string;
   scanner: string;

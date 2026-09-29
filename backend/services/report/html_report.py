@@ -111,6 +111,16 @@ def _readiness_bars(model: ReportModel) -> str:
     return "".join(rows)
 
 
+def _ai_summary_block(model: ReportModel) -> str:
+    if not model.ai_summary:
+        return ""
+    return (
+        '<h2>AI Summary</h2>'
+        '<div class="summary" style="border-left:4px solid #7c3aed;white-space:pre-wrap">'
+        f"{_e(model.ai_summary)}</div>"
+    )
+
+
 def _list_block(title: str, items: list[str]) -> str:
     if not items:
         return ""
@@ -280,6 +290,7 @@ def render_html(model: ReportModel) -> str:
 
 <h2>Executive Summary</h2>
 <div class="summary">{_e(model.executive_summary)}</div>
+{_ai_summary_block(model)}
 
 <h2>Repository Information</h2>
 {_repo_table(model)}

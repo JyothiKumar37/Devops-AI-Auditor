@@ -49,6 +49,89 @@ class LLMHealthResponse(BaseModel):
     latency_ms: int | None = None
 
 
+class LLMSettingsResponse(BaseModel):
+    """Current effective LLM configuration and any runtime override."""
+
+    provider: str
+    model: str  # effective model (override if set, else the env default)
+    env_model: str  # the environment default
+    overridden: bool
+    configured: bool
+
+
+class LLMModelUpdate(BaseModel):
+    """Set (or clear, when empty) the runtime LLM model override."""
+
+    model: str = Field(default="", max_length=128)
+
+
+# ---- AI assistance (interactive LLM features) -----------------------------
+
+
+class AiExplanation(BaseModel):
+    explanation: str
+
+
+class AiFixSuggestion(BaseModel):
+    """A review-only AI-proposed patch. Never auto-applied."""
+
+    file_path: str | None = None
+    before: str
+    after: str
+    diff: str
+    explanation: str
+    changed: bool
+
+
+class AiTriage(BaseModel):
+    likely_false_positive: bool
+    confidence: str
+    reason: str
+
+
+class AiScanSummary(BaseModel):
+    summary: str
+
+
+class AiPriorityItem(BaseModel):
+    finding_id: uuid.UUID
+    rule_id: str
+    severity: str
+    title: str
+    file: str | None = None
+    rationale: str
+
+
+class AiPriorities(BaseModel):
+    items: list[AiPriorityItem] = []
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class AiAnswer(BaseModel):
+    answer: str
+
+
+class ChatMessageRead(BaseModel):
+    """One persisted message in a scan's AI conversation."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    role: str
+    content: str
+    created_at: datetime
+
+
+class ChatHistory(BaseModel):
+    """A scan's full AI conversation, oldest first."""
+
+    scan_id: uuid.UUID
+    messages: list[ChatMessageRead] = []
+
+
 class ServiceInfo(BaseModel):
     """Basic service metadata returned at the API root."""
 

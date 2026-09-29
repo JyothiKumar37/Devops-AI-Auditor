@@ -1,6 +1,8 @@
 """Persistence models and shared API schemas."""
 
+from models.app_setting import AppSetting
 from models.base import Base
+from models.chat import ChatMessage
 from models.enums import (
     Confidence,
     FindingCategory,
@@ -15,7 +17,9 @@ from models.scan import RepositoryFile, Scan
 from models.suppression import Suppression
 
 __all__ = [
+    "AppSetting",
     "Base",
+    "ChatMessage",
     "Confidence",
     "Finding",
     "FindingCategory",

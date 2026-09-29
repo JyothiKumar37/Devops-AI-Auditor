@@ -23,7 +23,7 @@ import type { CrossFileRisk, ReportFinding, ReportModel } from "@/types/api";
 
 function DownloadBar({ scanId }: { scanId: string }) {
   const actions: { label: string; href: string; primary?: boolean }[] = [
-    { label: "Open printable view", href: api.reportExportUrl(scanId, "html", false) },
+    { label: "Open printable view", href: api.reportExportUrl(scanId, "html", { download: false }) },
     { label: "Download PDF", href: api.reportExportUrl(scanId, "pdf"), primary: true },
     { label: "JSON", href: api.reportExportUrl(scanId, "json") },
   ];

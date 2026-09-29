@@ -74,6 +74,8 @@ class Database:
         unreachable (startup must not crash when the DB is temporarily down).
         """
         # Import models so they register on the metadata before create_all.
+        from models import app_setting as _app_setting  # noqa: F401
+        from models import chat as _chat  # noqa: F401
         from models import finding as _finding  # noqa: F401
         from models import scan as _scan  # noqa: F401
         from models import suppression as _suppression  # noqa: F401

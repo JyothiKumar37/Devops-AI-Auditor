@@ -48,6 +48,7 @@ from services.fingerprint import finding_fingerprint
 from services.ingestion.archive import ArchiveValidationError, ZipArchiveExtractor
 from services.ingestion.git import GitCloneError, GitRepositoryCloner
 from services.ingestion.workspace import Workspace, WorkspaceManager
+from services.runtime_config import resolve_settings
 from services.suppression_service import suppressed_fingerprints
 
 logger = get_logger(__name__)
@@ -91,6 +92,9 @@ class ScanService:
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
         self._session = session
         self._settings = settings
+        # Settings with runtime overrides (e.g. LLM model) applied; resolved per
+        # scan in `_process_repo` and used by the AI review pass.
+        self._ai_settings: Settings | None = None
         self._workspaces = WorkspaceManager(settings)
         self._extractor = ZipArchiveExtractor(settings)
         self._cloner = GitRepositoryCloner(settings)
@@ -690,7 +694,7 @@ class ScanService:
         """Append LLM-review findings, deduped against the deterministic ones."""
         if not self._settings.ai_scan_enabled:
             return
-        reviewer = AIReviewScanner(self._settings)
+        reviewer = AIReviewScanner(self._ai_settings or self._settings)
         if not reviewer.available:
             return
 
@@ -702,6 +706,7 @@ class ScanService:
         occupied = {
             (f.file_id, f.line_number) for f in findings if f.line_number is not None
         }
+        added = 0
         for rule_finding in reviewer.analyze_repo(repo_root, paths):
             file_id = file_id_by_path.get(rule_finding.file_path or "")
             if (
@@ -710,6 +715,13 @@ class ScanService:
             ):
                 continue
             findings.append(self._to_finding(scan_id, file_id, rule_finding))
+            added += 1
+        logger.info(
+            "ai_review_completed",
+            scan_id=str(scan_id),
+            files_reviewed=len(paths),
+            findings_added=added,
+        )
 
     @staticmethod
     def _read_file_content(path: Path) -> str | None:
@@ -937,6 +949,9 @@ class ScanService:
                 )
             )
         self._session.add_all(repo_files)
+
+        # Apply any runtime overrides (e.g. a switched LLM model) for the AI pass.
+        self._ai_settings = await resolve_settings(self._session, self._settings)
 
         # Run deterministic scanners while the workspace still exists.
         findings = self._run_scanners(

@@ -13,6 +13,7 @@ import {
   useSuppressFinding,
   useUnsuppressFinding,
 } from "@/hooks/useScans";
+import { useExplainFinding, useSuggestFix, useTriageFinding } from "@/hooks/useAi";
 import { prettyLabel } from "@/lib/format";
 import type { SuppressionReason } from "@/types/api";
 
@@ -35,6 +36,26 @@ const PRIMARY_BTN =
   "inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50";
 const APPROVE_BTN =
   "inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50";
+const SECONDARY_BTN =
+  "inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+function AiBox({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-3 rounded-lg border border-violet-200 bg-violet-50/50 p-3">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-violet-700">{title}</p>
+      <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{children}</div>
+    </div>
+  );
+}
+
+function AiError({ error }: { error: Error | null }) {
+  if (!error) return null;
+  return (
+    <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 ring-1 ring-inset ring-rose-600/20">
+      {error.message}
+    </p>
+  );
+}
 
 export default function FindingDetails() {
   const { scanId, findingId } = useParams();
@@ -49,6 +70,9 @@ export default function FindingDetails() {
   const apply = useApplyRemediation(id ?? "", fid);
   const suppress = useSuppressFinding(id ?? "");
   const unsuppress = useUnsuppressFinding(id ?? "");
+  const explain = useExplainFinding(id ?? "", fid);
+  const triage = useTriageFinding(id ?? "", fid);
+  const aiFix = useSuggestFix(id ?? "", fid);
   const [reason, setReason] = useState<SuppressionReason>("false_positive");
   const [note, setNote] = useState("");
 
@@ -248,6 +272,100 @@ export default function FindingDetails() {
           </div>
         </Card>
       </div>
+
+      {/* AI assistant: on-demand explain / triage / suggest fix (review-only) */}
+      <Card className="mt-6 p-5">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">AI assistant</h2>
+            <p className="text-xs text-slate-500">
+              On-demand help grounded in this finding, using your configured LLM. Suggestions are
+              never applied automatically.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={SECONDARY_BTN}
+              onClick={() => explain.mutate()}
+              disabled={explain.isPending}
+            >
+              {explain.isPending ? "Explaining…" : "Explain"}
+            </button>
+            <button
+              type="button"
+              className={SECONDARY_BTN}
+              onClick={() => triage.mutate()}
+              disabled={triage.isPending}
+            >
+              {triage.isPending ? "Checking…" : "Triage"}
+            </button>
+            <button
+              type="button"
+              className={SECONDARY_BTN}
+              onClick={() => aiFix.mutate()}
+              disabled={aiFix.isPending}
+            >
+              {aiFix.isPending ? "Thinking…" : "Suggest fix (AI)"}
+            </button>
+          </div>
+        </div>
+
+        <AiError error={(explain.error ?? triage.error ?? aiFix.error) as Error | null} />
+
+        {explain.data ? <AiBox title="Explanation">{explain.data.explanation}</AiBox> : null}
+
+        {triage.data ? (
+          <AiBox title="False-positive triage">
+            <div className="mb-1 flex items-center gap-2">
+              <Badge
+                className={
+                  triage.data.likely_false_positive
+                    ? "bg-amber-50 text-amber-700 ring-amber-600/20"
+                    : "bg-emerald-50 text-emerald-700 ring-emerald-600/20"
+                }
+              >
+                {triage.data.likely_false_positive ? "Likely false positive" : "Likely real"}
+              </Badge>
+              <span className="text-xs text-slate-500">confidence: {triage.data.confidence}</span>
+            </div>
+            {triage.data.reason}
+            {triage.data.likely_false_positive && !finding.suppressed ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className={SECONDARY_BTN}
+                  onClick={() =>
+                    suppress.mutate({
+                      findingId: finding.id,
+                      reason: "false_positive",
+                      note: triage.data?.reason?.slice(0, 500),
+                    })
+                  }
+                  disabled={suppress.isPending}
+                >
+                  Suppress as false positive
+                </button>
+              </div>
+            ) : null}
+          </AiBox>
+        ) : null}
+
+        {aiFix.data ? (
+          <AiBox title="Suggested fix (review only — not applied)">
+            {aiFix.data.explanation ? <p className="mb-2">{aiFix.data.explanation}</p> : null}
+            {aiFix.data.changed && aiFix.data.diff ? (
+              <DiffView
+                diff={aiFix.data.diff}
+                before={aiFix.data.before}
+                after={aiFix.data.after}
+              />
+            ) : (
+              <p className="text-xs text-slate-500">The model did not propose a code change.</p>
+            )}
+          </AiBox>
+        ) : null}
+      </Card>
 
       {/* Remediation: generate -> review diff -> approve -> apply -> verify */}
       <Card className="mt-6 p-5">

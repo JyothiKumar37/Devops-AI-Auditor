@@ -125,6 +125,9 @@ class ReportModel(BaseModel):
 
     repository: RepositoryInfo
     executive_summary: str
+    # Optional AI-generated narrative summary (populated only when explicitly
+    # requested and an LLM provider is configured).
+    ai_summary: str | None = None
     llm_used: bool
 
     production_readiness: ReadinessSection

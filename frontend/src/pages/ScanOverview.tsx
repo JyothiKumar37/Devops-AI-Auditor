@@ -1,9 +1,13 @@
 import { Link, useParams } from "react-router-dom";
 
 import { Card, SeverityPill, Spinner } from "@/components/ui";
+import { useAiSummary, usePriorities } from "@/hooks/useAi";
 import { useDiscovery, useReport, useScan } from "@/hooks/useScans";
 import { CATEGORY_META, SEVERITY_ORDER, severityMeta } from "@/lib/format";
 import type { DiscoveryCategory } from "@/types/api";
+
+const AI_BTN =
+  "inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
 
 const SEV_HEX: Record<string, string> = {
   critical: "#f43f5e",
@@ -65,6 +69,10 @@ export default function ScanOverview() {
   const isDone = scan?.status === "completed";
   const { data: discovery } = useDiscovery(isDone ? id : null);
   const { data: report } = useReport(isDone ? id : null);
+
+  const aiSummary = useAiSummary(id ?? "");
+  const aiRisks = usePriorities(id ?? "");
+  const aiError = (aiSummary.error ?? aiRisks.error) as Error | null;
 
   if (scan && !isDone) {
     return (
@@ -221,6 +229,77 @@ export default function ScanOverview() {
           )}
         </Card>
       </div>
+
+      {/* AI assistant: summary, context-aware risk ranking, and grounded Q&A. */}
+      <Card className="p-5">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="section-title">AI assistant</p>
+            <p className="text-xs text-slate-500">
+              Summary, risk ranking and Q&amp;A grounded in this scan. Uses your configured LLM.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={AI_BTN}
+              onClick={() => aiSummary.mutate()}
+              disabled={aiSummary.isPending}
+            >
+              {aiSummary.isPending ? "Summarizing…" : "AI summary"}
+            </button>
+            <button
+              type="button"
+              className={AI_BTN}
+              onClick={() => aiRisks.mutate()}
+              disabled={aiRisks.isPending}
+            >
+              {aiRisks.isPending ? "Ranking…" : "Top risks"}
+            </button>
+          </div>
+        </div>
+
+        {aiError ? (
+          <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 ring-1 ring-inset ring-rose-600/20">
+            {aiError.message}
+          </p>
+        ) : null}
+
+        {aiSummary.data ? (
+          <div className="mt-2 whitespace-pre-wrap rounded-lg border border-violet-200 bg-violet-50/50 p-3 text-sm leading-relaxed text-slate-700">
+            {aiSummary.data.summary}
+          </div>
+        ) : null}
+
+        {aiRisks.data && aiRisks.data.items.length ? (
+          <ol className="mt-3 space-y-2">
+            {aiRisks.data.items.map((item, i) => (
+              <li key={item.finding_id} className="flex items-start gap-2.5 text-sm">
+                <span className="mt-0.5 w-5 shrink-0 text-right font-mono text-xs text-slate-400">
+                  {i + 1}
+                </span>
+                <SeverityPill severity={item.severity} />
+                <div className="min-w-0">
+                  <Link
+                    to={`/scans/${id}/findings/${item.finding_id}`}
+                    className="font-medium text-slate-800 hover:text-brand"
+                  >
+                    {item.title}
+                  </Link>
+                  <p className="text-xs text-slate-500">{item.rationale}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        ) : null}
+
+        <Link
+          to={`/scans/${id}/chat`}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+        >
+          Ask questions in the AI chat →
+        </Link>
+      </Card>
     </div>
   );
 }

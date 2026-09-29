@@ -251,6 +251,13 @@ def render_pdf(model: ReportModel) -> bytes:
     story.append(Paragraph("Executive Summary", st["h2"]))
     story.append(Paragraph(_e(model.executive_summary), st["body"]))
 
+    # Optional AI narrative summary
+    if model.ai_summary:
+        story.append(Paragraph("AI Summary", st["h2"]))
+        for para in model.ai_summary.split("\n"):
+            if para.strip():
+                story.append(Paragraph(_e(para.strip()), st["body"]))
+
     # Repository information
     r = model.repository
     file_types = ", ".join(f"{k}: {v}" for k, v in r.file_type_counts.items()) or "—"

@@ -311,13 +311,18 @@ async def export_scan_report(
     download: bool = Query(
         True, description="Send as a file download (Content-Disposition: attachment)."
     ),
+    ai: bool = Query(
+        False,
+        description="Include an AI-generated executive summary (requires a configured LLM).",
+    ),
 ) -> Response:
     """Render the full audit report (all sections) in the requested format.
 
     The JSON form is the stable, machine-readable representation; HTML and PDF
-    are human-facing views of the same underlying model.
+    are human-facing views of the same underlying model. With ``ai=true`` a
+    best-effort AI summary is added (omitted if no LLM is configured).
     """
-    content, media_type, filename = await service.render(scan_id, format)
+    content, media_type, filename = await service.render(scan_id, format, include_ai=ai)
     disposition = "attachment" if download else "inline"
     return Response(
         content=content,

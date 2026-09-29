@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from agents.reasoning.llm import LLMMessage, LLMProvider
 from core.config import Settings
 from main import create_app
 from models.enums import ScanStatus, SourceType
@@ -28,6 +29,20 @@ from services.report.json_report import render_json
 from services.report.model import REPORT_SCHEMA_VERSION
 from services.report.pdf_report import render_pdf
 from services.report.sarif_report import render_sarif
+
+
+class _FakeProvider(LLMProvider):
+    name = "fake"
+
+    def __init__(self, payload: str) -> None:
+        self._payload = payload
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    def complete(self, messages: list[LLMMessage], *, temperature: float = 0.0) -> str:
+        return self._payload
 
 # ---------------------------------------------------------------------------
 # Builder (in-memory, no DB)
@@ -222,10 +237,10 @@ def test_json_is_stable_and_machine_readable() -> None:
     # Stable top-level key order.
     assert list(payload.keys()) == [
         "schema_version", "report_id", "generated_at", "title", "repository",
-        "executive_summary", "llm_used", "production_readiness", "total_findings",
-        "reviewed_false_positives", "severity_summary", "issues_by_severity",
-        "findings_by_domain", "cross_file_risks", "remediation_plan",
-        "recommendations", "detailed_findings",
+        "executive_summary", "ai_summary", "llm_used", "production_readiness",
+        "total_findings", "reviewed_false_positives", "severity_summary",
+        "issues_by_severity", "findings_by_domain", "cross_file_risks",
+        "remediation_plan", "recommendations", "detailed_findings",
     ]
     assert payload["total_findings"] == 5
 
@@ -374,6 +389,27 @@ def test_export_sarif(client: TestClient) -> None:
     assert len(doc["runs"][0]["results"]) > 0
     # Masked evidence: the raw AWS key must never leak into the SARIF either.
     assert "AKIAIOSFODNN7EXAMPLE" not in response.text
+
+
+def test_export_includes_ai_summary_when_requested(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        "agents.ai_assist.service.get_provider",
+        lambda _s: _FakeProvider(json.dumps({"summary": "The image runs as root; fix first."})),
+    )
+    scan_id = _upload(client)
+    body = client.get(f"/api/v1/scans/{scan_id}/report/export?format=json&ai=true").json()
+    assert body["ai_summary"] and "root" in body["ai_summary"].lower()
+
+
+def test_export_ai_summary_best_effort_without_provider(client: TestClient) -> None:
+    # No LLM configured: ai=true must not break the export; summary is just omitted.
+    scan_id = _upload(client)
+    with_ai = client.get(f"/api/v1/scans/{scan_id}/report/export?format=json&ai=true").json()
+    assert with_ai["ai_summary"] is None
+    without = client.get(f"/api/v1/scans/{scan_id}/report/export?format=json").json()
+    assert without["ai_summary"] is None
 
 
 def test_export_excludes_suppressed_findings(client: TestClient) -> None:
