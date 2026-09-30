@@ -16,15 +16,19 @@ from __future__ import annotations
 import hashlib
 import uuid
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings
 from core.exceptions import NotFoundError
 from core.logging import get_logger
-from models.enums import Confidence
+from models.enums import Confidence, Severity
 from models.finding import Finding
+from models.remediation_history import RemediationHistory
 from models.scan import RepositoryFile
 from models.schemas import (
+    RemediationHistoryItem,
+    RemediationHistoryResponse,
     RemediationProposal,
     RemediationResult,
     RemediationStatus,
@@ -176,6 +180,12 @@ class RemediationService:
             return self._manual_result(finding, MANUAL_REQUIRED)
 
         diff = build_diff(repo_file.path, content, outcome.new_content)
+        # Snapshot the scan's severity distribution BEFORE this remediation.
+        severity = str(finding.severity)
+        rule_id = finding.rule_id
+        file_path = repo_file.path
+        scanner = finding.scanner
+        before_counts = await self._severity_counts(scan_id)
 
         # Patch ONLY the stored repository copy - never a user repository.
         repo_file.content = outcome.new_content
@@ -183,25 +193,40 @@ class RemediationService:
         repo_file.size = len(encoded)
         repo_file.checksum = hashlib.sha256(encoded).hexdigest()
 
-        rescanned = self._rescan(finding.scanner, repo_file.path, outcome.new_content)
+        rescanned = self._rescan(scanner, repo_file.path, outcome.new_content)
         if rescanned is None:
             # No re-scanner for this scanner: we cannot verify, so never claim
             # resolution. (Unreachable for the rules that have fixers today.)
+            message = (
+                "The fix was applied but this finding's scanner cannot be re-run "
+                "to verify it. Manual verification required."
+            )
+            after_counts = dict(before_counts)
+            self._add_history(
+                scan_id, finding_id, rule_id, scanner, file_path, severity,
+                applied=True, resolved=False, remaining=[rule_id], diff=diff,
+                message=message, before=before_counts, after=after_counts,
+            )
             await self._session.commit()
             return RemediationResult(
                 finding_id=finding_id,
-                rule_id=finding.rule_id,
+                rule_id=rule_id,
                 applied=True,
                 resolved=False,
-                remaining_rule_ids=[finding.rule_id],
+                remaining_rule_ids=[rule_id],
                 diff=diff,
-                message="The fix was applied but this finding's scanner cannot be re-run "
-                "to verify it. Manual verification required.",
+                message=message,
+                severity=severity,
+                before_counts=before_counts,
+                after_counts=after_counts,
             )
         remaining = sorted({rf.rule_id for rf in rescanned})
         resolved = not self._still_present(finding, rescanned)
 
+        # After-counts: a verified resolution removes exactly this finding.
+        after_counts = dict(before_counts)
         if resolved:
+            after_counts[severity] = max(0, after_counts.get(severity, 0) - 1)
             await self._session.delete(finding)
             message = "Fix applied to the stored copy and verified: the finding is resolved."
         else:
@@ -210,22 +235,98 @@ class RemediationService:
                 "re-scan. Manual remediation required."
             )
 
+        self._add_history(
+            scan_id, finding_id, rule_id, scanner, file_path, severity,
+            applied=True, resolved=resolved, remaining=remaining, diff=diff,
+            message=message, before=before_counts, after=after_counts,
+        )
         await self._session.commit()
         logger.info(
             "remediation_applied",
             scan_id=str(scan_id),
             finding_id=str(finding_id),
-            rule_id=finding.rule_id,
+            rule_id=rule_id,
             resolved=resolved,
         )
         return RemediationResult(
             finding_id=finding_id,
-            rule_id=finding.rule_id,
+            rule_id=rule_id,
             applied=True,
             resolved=resolved,
             remaining_rule_ids=remaining,
             diff=diff,
             message=message,
+            severity=severity,
+            before_counts=before_counts,
+            after_counts=after_counts,
+        )
+
+    async def _severity_counts(self, scan_id: uuid.UUID) -> dict[str, int]:
+        """Current severity distribution across a scan's findings."""
+        counts = {s.value: 0 for s in Severity}
+        rows = await self._session.execute(
+            select(Finding.severity, func.count())
+            .where(Finding.scan_id == scan_id)
+            .group_by(Finding.severity)
+        )
+        for sev, count in rows.all():
+            counts[str(sev)] = int(count)
+        return counts
+
+    def _add_history(
+        self,
+        scan_id: uuid.UUID,
+        finding_id: uuid.UUID,
+        rule_id: str,
+        scanner: str,
+        file_path: str | None,
+        severity: str,
+        *,
+        applied: bool,
+        resolved: bool,
+        remaining: list[str],
+        diff: str | None,
+        message: str,
+        before: dict[str, int],
+        after: dict[str, int],
+    ) -> None:
+        """Queue an immutable remediation audit record (committed by the caller)."""
+        self._session.add(
+            RemediationHistory(
+                id=uuid.uuid4(),
+                scan_id=scan_id,
+                finding_id=finding_id,
+                rule_id=rule_id,
+                scanner=scanner,
+                file_path=file_path,
+                severity=severity,
+                applied=applied,
+                resolved=resolved,
+                remaining_rule_ids=remaining,
+                diff=diff,
+                message=message,
+                before_counts=before,
+                after_counts=after,
+            )
+        )
+
+    async def history(self, scan_id: uuid.UUID) -> RemediationHistoryResponse:
+        """Return the scan's remediation audit trail, most recent first."""
+        rows = list(
+            (
+                await self._session.scalars(
+                    select(RemediationHistory)
+                    .where(RemediationHistory.scan_id == scan_id)
+                    .order_by(RemediationHistory.created_at.desc())
+                )
+            ).all()
+        )
+        resolved_count = sum(1 for r in rows if r.resolved)
+        return RemediationHistoryResponse(
+            scan_id=scan_id,
+            total=len(rows),
+            resolved_count=resolved_count,
+            items=[RemediationHistoryItem.model_validate(r) for r in rows],
         )
 
     # -- internals -----------------------------------------------------------

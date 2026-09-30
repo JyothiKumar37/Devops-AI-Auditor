@@ -77,6 +77,7 @@ class Database:
         from models import app_setting as _app_setting  # noqa: F401
         from models import chat as _chat  # noqa: F401
         from models import finding as _finding  # noqa: F401
+        from models import remediation_history as _remediation_history  # noqa: F401
         from models import scan as _scan  # noqa: F401
         from models import suppression as _suppression  # noqa: F401
         from models.base import Base

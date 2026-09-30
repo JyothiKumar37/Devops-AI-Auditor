@@ -28,14 +28,20 @@ from core.exceptions import NotFoundError
 from models.enums import ScanStatus
 from models.scan import Scan
 from models.schemas import (
+    ContainerSecurityResponse,
+    DependenciesResponse,
     DiscoveryResponse,
     FindingRead,
     FindingsResponse,
     GitScanRequest,
+    KubernetesScoreResponse,
+    PostureResponse,
+    RemediationHistoryResponse,
     RemediationProposal,
     RemediationResult,
     RepositoryFileContent,
     RepositoryFileRead,
+    RiskSummaryResponse,
     ScanDiffResponse,
     ScanFilesResponse,
     ScanListResponse,
@@ -43,6 +49,7 @@ from models.schemas import (
     SuppressionListResponse,
     SuppressionRead,
     SuppressRequest,
+    TrendsResponse,
 )
 from services.report import ReportFormat
 from services.scan_service import ScanService
@@ -349,6 +356,14 @@ async def get_scan_findings(
         None,
         description="Filter by baseline status: true = only suppressed, false = only active.",
     ),
+    priority: str | None = Query(
+        None,
+        description="Filter by risk priority band: immediate | high | normal | low.",
+    ),
+    sort: str = Query(
+        "severity",
+        description="Ordering: 'severity' (default) or 'risk' (deterministic risk score).",
+    ),
 ) -> FindingsResponse:
     findings, severity_counts, suppressed_count = await service.get_findings(
         scan_id,
@@ -359,6 +374,8 @@ async def get_scan_findings(
         file_id=file_id,
         file_type=file_type,
         suppressed=suppressed,
+        priority=priority,
+        sort=sort,
     )
     return FindingsResponse(
         scan_id=scan_id,
@@ -367,6 +384,137 @@ async def get_scan_findings(
         suppressed_count=suppressed_count,
         items=[FindingRead.model_validate(f) for f in findings],
     )
+
+
+@router.get(
+    "/{scan_id}/trends",
+    response_model=TrendsResponse,
+    summary="Historical trend across the repository's completed scans",
+)
+async def get_scan_trends(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+    limit: int = Query(30, ge=2, le=100, description="Max scans to include (most recent)."),
+) -> TrendsResponse:
+    """Chronological trend of readiness, findings and severity for the scan's
+    repository, plus new/fixed/unchanged deltas between consecutive scans.
+    """
+    trends = await service.get_trends(scan_id, limit=limit)
+    return TrendsResponse.model_validate(trends)
+
+
+@router.get(
+    "/{scan_id}/dependencies",
+    response_model=DependenciesResponse,
+    summary="Dependency inventory (SBOM components) parsed from manifests",
+)
+async def get_scan_dependencies(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+) -> DependenciesResponse:
+    """Parse Node/Python dependency manifests into a de-duplicated inventory.
+
+    This is a software bill of materials, not a vulnerability scan: no CVE data
+    is bundled, so `vulnerabilities_available` is false and severity counts are
+    zero (not to be read as "no vulnerabilities").
+    """
+    result = await service.get_dependencies(scan_id)
+    return DependenciesResponse.model_validate(result)
+
+
+@router.get(
+    "/{scan_id}/sbom",
+    summary="CycloneDX JSON software bill of materials for a scan",
+)
+async def get_scan_sbom(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+    download: bool = Query(False, description="Send as a file download attachment."),
+) -> Response:
+    """Return the scan's CycloneDX 1.5 SBOM as JSON (inline or as a download)."""
+    import json
+
+    sbom = await service.get_sbom(scan_id)
+    disposition = "attachment" if download else "inline"
+    return Response(
+        content=json.dumps(sbom, indent=2),
+        media_type="application/vnd.cyclonedx+json",
+        headers={
+            "Content-Disposition": f'{disposition}; filename="sbom-{scan_id}.cdx.json"'
+        },
+    )
+
+
+@router.get(
+    "/{scan_id}/container-security",
+    response_model=ContainerSecurityResponse,
+    summary="Container-security score (Docker + Compose) for a scan",
+)
+async def get_scan_container_security(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+) -> ContainerSecurityResponse:
+    """Deterministic container-security score across security, runtime hardening,
+    image hygiene and build quality. Reports `applicable: false` when the
+    repository has no Dockerfile or Compose file.
+    """
+    result = await service.get_container_security(scan_id)
+    return ContainerSecurityResponse.model_validate(result)
+
+
+@router.get(
+    "/{scan_id}/kubernetes-score",
+    response_model=KubernetesScoreResponse,
+    summary="Kubernetes production-readiness score (six dimensions) for a scan",
+)
+async def get_scan_kubernetes_score(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+) -> KubernetesScoreResponse:
+    """Deterministic Kubernetes readiness score across security, reliability,
+    availability, resource management, networking and observability. Reports
+    `applicable: false` when the repository has no Kubernetes manifests.
+    """
+    result = await service.get_kubernetes_score(scan_id)
+    return KubernetesScoreResponse.model_validate(result)
+
+
+@router.get(
+    "/{scan_id}/posture",
+    response_model=PostureResponse,
+    summary="Security/DevOps posture overview (per-domain scores) for a scan",
+)
+async def get_scan_posture(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+) -> PostureResponse:
+    """Per-domain posture scores (security, infrastructure, CI/CD, kubernetes,
+    containers, terraform, reliability, secrets, dependencies) computed
+    deterministically from the scan's active findings. The overall score is the
+    production-readiness score; no value is produced by an LLM.
+    """
+    posture = await service.get_posture(scan_id)
+    return PostureResponse.model_validate(posture)
+
+
+@router.get(
+    "/{scan_id}/risk-summary",
+    response_model=RiskSummaryResponse,
+    summary="Deterministic risk prioritisation overview for a scan",
+)
+async def get_scan_risk_summary(
+    scan_id: uuid.UUID,
+    service: ScanServiceDep,
+    top: int = Query(15, ge=1, le=100, description="How many top-risk findings to return."),
+) -> RiskSummaryResponse:
+    """Rank the scan's active findings by a deterministic 0-100 risk score.
+
+    The score is computed from severity, exploitability, exposure, production
+    impact, confidence, recurrence and asset criticality - never from an LLM -
+    so the ranking is reproducible. Suppressed findings are excluded.
+    """
+    summary = await service.get_risk_summary(scan_id, top=top)
+    return RiskSummaryResponse.model_validate(summary)
 
 
 @router.post(
@@ -452,3 +600,20 @@ async def apply_remediation(
     after the user reviews the diff and approves. No user repository is touched.
     """
     return await service.apply(scan_id, finding_id)
+
+
+@router.get(
+    "/{scan_id}/remediation-history",
+    response_model=RemediationHistoryResponse,
+    summary="List approved remediation attempts and their verification results",
+)
+async def get_remediation_history(
+    scan_id: uuid.UUID,
+    service: RemediationServiceDep,
+) -> RemediationHistoryResponse:
+    """Immutable audit trail of remediations applied on this scan.
+
+    Each record captures the finding, the applied diff, whether re-scan verified
+    resolution, and the scan's before/after severity snapshot.
+    """
+    return await service.history(scan_id)

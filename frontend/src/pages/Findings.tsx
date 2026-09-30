@@ -3,8 +3,43 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { Badge, Card, EmptyState, Field, SeverityPill, Spinner } from "@/components/ui";
 import { useFindings, useScanFiles } from "@/hooks/useScans";
-import { SEVERITY_ORDER, prettyLabel, severityMeta } from "@/lib/format";
+import {
+  RISK_PRIORITY_ORDER,
+  SEVERITY_ORDER,
+  prettyLabel,
+  riskPriorityMeta,
+  riskScoreColor,
+  severityMeta,
+} from "@/lib/format";
 import type { Finding } from "@/types/api";
+
+function RiskCell({ finding }: { finding: Finding }) {
+  const meta = riskPriorityMeta(finding.risk_priority);
+  return (
+    <div className="flex items-center gap-2" title={finding.risk_explanation}>
+      <span
+        className="inline-flex h-7 w-9 items-center justify-center rounded-md text-xs font-bold tabular-nums text-white"
+        style={{ background: riskScoreColor(finding.risk_score) }}
+      >
+        {finding.risk_score}
+      </span>
+      <span
+        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${meta.badge}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden />
+        {meta.label}
+      </span>
+    </div>
+  );
+}
+
+const SEVERITY_RANK: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
 
 function Select({
   value,
@@ -44,6 +79,10 @@ export default function Findings() {
   const [confidence, setConfidence] = useState("");
   const [fileType, setFileType] = useState("");
   const [search, setSearch] = useState("");
+  const [priority, setPriority] = useState(() => searchParams.get("priority") ?? "");
+  const [sort, setSort] = useState<"severity" | "risk">(
+    () => (searchParams.get("sort") === "risk" ? "risk" : "severity"),
+  );
   // Suppressed (baselined) findings are hidden by default to declutter the list.
   const [showSuppressed, setShowSuppressed] = useState(false);
 
@@ -79,6 +118,7 @@ export default function Findings() {
       if (category && f.category !== category) return false;
       if (scanner && f.scanner !== scanner) return false;
       if (confidence && f.confidence !== confidence) return false;
+      if (priority && f.risk_priority !== priority) return false;
       const meta = fileById.get(f.file_id ?? "");
       if (fileType && meta?.file_type !== fileType) return false;
       if (term) {
@@ -87,10 +127,25 @@ export default function Findings() {
       }
       return true;
     });
-  }, [items, severity, category, scanner, confidence, fileType, search, showSuppressed, fileById]);
+  }, [items, severity, category, scanner, confidence, priority, fileType, search, showSuppressed, fileById]);
+
+  // Client-side ordering: by nominal severity (default) or deterministic risk.
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    if (sort === "risk") {
+      arr.sort((a, b) => b.risk_score - a.risk_score);
+    } else {
+      arr.sort(
+        (a, b) =>
+          (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0) ||
+          b.risk_score - a.risk_score,
+      );
+    }
+    return arr;
+  }, [filtered, sort]);
 
   const activeFilters =
-    Boolean(severity || category || scanner || confidence || fileType || search.trim());
+    Boolean(severity || category || scanner || confidence || priority || fileType || search.trim());
 
   return (
     <div className="space-y-4">
@@ -162,6 +217,14 @@ export default function Findings() {
           <Field label="Confidence">
             <Select value={confidence} onChange={setConfidence} options={["high", "medium", "low"]} placeholder="All" />
           </Field>
+          <Field label="Risk priority">
+            <Select
+              value={priority}
+              onChange={setPriority}
+              options={[...RISK_PRIORITY_ORDER]}
+              placeholder="All"
+            />
+          </Field>
           <Field label="File type">
             <Select value={fileType} onChange={setFileType} options={options.fileTypes} placeholder="All" />
           </Field>
@@ -179,29 +242,53 @@ export default function Findings() {
         <Card className="overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-2.5 text-xs text-slate-500">
             <span>
-              Showing <span className="font-semibold text-slate-700">{filtered.length}</span> of {items.length} findings
+              Showing <span className="font-semibold text-slate-700">{sorted.length}</span> of {items.length} findings
             </span>
-            {activeFilters ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSeverity("");
-                  setCategory("");
-                  setScanner("");
-                  setConfidence("");
-                  setFileType("");
-                  setSearch("");
-                }}
-                className="font-medium text-brand hover:text-brand-deep hover:underline"
-              >
-                Clear filters
-              </button>
-            ) : null}
+            <div className="flex items-center gap-3">
+              <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+                <button
+                  type="button"
+                  onClick={() => setSort("severity")}
+                  className={`px-2.5 py-1 font-medium transition-colors ${
+                    sort === "severity" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Severity
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSort("risk")}
+                  className={`px-2.5 py-1 font-medium transition-colors ${
+                    sort === "risk" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Risk
+                </button>
+              </div>
+              {activeFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeverity("");
+                    setCategory("");
+                    setScanner("");
+                    setConfidence("");
+                    setPriority("");
+                    setFileType("");
+                    setSearch("");
+                  }}
+                  className="font-medium text-brand hover:text-brand-deep hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : null}
+            </div>
           </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200/80 text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-5 py-2.5 font-semibold">Severity</th>
+                <th className="px-5 py-2.5 font-semibold">Risk</th>
                 <th className="px-5 py-2.5 font-semibold">Finding</th>
                 <th className="px-5 py-2.5 font-semibold">Scanner</th>
                 <th className="px-5 py-2.5 font-semibold">Location</th>
@@ -209,7 +296,7 @@ export default function Findings() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((f) => {
+              {sorted.map((f) => {
                 const meta = fileById.get(f.file_id ?? "");
                 return (
                   <tr
@@ -220,6 +307,9 @@ export default function Findings() {
                   >
                     <td className="px-5 py-3">
                       <SeverityPill severity={f.severity} />
+                    </td>
+                    <td className="px-5 py-3">
+                      <RiskCell finding={f} />
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">

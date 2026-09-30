@@ -206,6 +206,15 @@ def assess(findings: list[dict[str, Any]], files: list[dict[str, Any]]) -> Produ
     )
 
 
+def category_penalty(members: list[dict[str, Any]]) -> float:
+    """Public wrapper: the severity/confidence penalty for a set of findings.
+
+    Exposed so other deterministic scorers (e.g. the posture engine) reuse the
+    exact same penalty model instead of duplicating the weights.
+    """
+    return _category_penalty(members)
+
+
 def _category_penalty(members: list[dict[str, Any]]) -> float:
     """Confidence-weighted penalty with per-severity diminishing returns.
 

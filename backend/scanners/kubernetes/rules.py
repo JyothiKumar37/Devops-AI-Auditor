@@ -60,6 +60,9 @@ RULES: dict[str, RuleSpec] = {
         "Unsafe sysctls", "Remove unsafe sysctls."),
     "K8S011": RuleSpec(C.SECURITY, S.HIGH, CF.HIGH,
         "Container runs as root (runAsUser 0)", "Run as a non-root UID."),
+    "K8S012": RuleSpec(C.SECURITY, S.LOW, CF.MEDIUM,
+        "Service account token auto-mounted",
+        "Set automountServiceAccountToken: false unless the workload calls the Kubernetes API."),
     # Reliability
     "K8S020": RuleSpec(C.RELIABILITY, S.LOW, CF.HIGH,
         "Missing readinessProbe", "Add a readinessProbe."),
@@ -92,6 +95,9 @@ RULES: dict[str, RuleSpec] = {
     "K8S041": RuleSpec(C.SECURITY, S.MEDIUM, CF.HIGH,
         "Service exposed via LoadBalancer",
         "Ensure a public LoadBalancer is intended and protected."),
+    "K8S042": RuleSpec(C.SECURITY, S.LOW, CF.MEDIUM,
+        "No NetworkPolicy governs an exposed namespace",
+        "Add a default-deny NetworkPolicy and explicitly allow required traffic."),
     "K8S043": RuleSpec(C.SECURITY, S.MEDIUM, CF.MEDIUM,
         "Ingress without TLS", "Configure spec.tls for the Ingress."),
     "K8S044": RuleSpec(C.SECURITY, S.LOW, CF.MEDIUM,
@@ -279,6 +285,15 @@ def _check_pod_security(resource: K8sResource, emit: Emitter) -> None:
         if unsafe:
             emit.add("K8S010", resource, description=f"Unsafe sysctls: {', '.join(unsafe)}.",
                      evidence=str(unsafe))
+
+    # Explicit auto-mount of the service-account token widens the blast radius
+    # of a compromised pod. Only flag an explicit `true` (evidence present).
+    if pod_spec.get("automountServiceAccountToken") is True:
+        emit.add("K8S012", resource,
+                 description=f"{resource.kind} '{resource.name}' auto-mounts the service "
+                 "account token.",
+                 line=line_of(pod_spec, "automountServiceAccountToken"),
+                 evidence="automountServiceAccountToken: true")
 
     pod_seccomp = _as_dict(pod_sc.get("seccompProfile")).get("type")
 

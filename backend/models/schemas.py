@@ -288,6 +288,18 @@ from models.enums import (  # noqa: E402
 )
 
 
+class RiskFactorsRead(BaseModel):
+    """The bounded contributions that make up a finding's risk score."""
+
+    severity_base: int
+    exploitability: int
+    exposure: int
+    production_impact: int
+    recurrence: int
+    confidence_factor: float
+    asset_criticality: float
+
+
 class FindingRead(BaseModel):
     """A single scanner finding, exposing the full evidence trail."""
 
@@ -310,6 +322,13 @@ class FindingRead(BaseModel):
     suppressed: bool = False
     suppression_reason: SuppressionReason | None = None
     suppression_note: str | None = None
+    # Deterministic risk prioritisation (annotated at read time, never stored).
+    # `risk_score` is 0-100; `risk_priority` is immediate|high|normal|low.
+    risk_score: int = 0
+    risk_priority: str = "low"
+    risk_explanation: str = ""
+    risk_signals: list[str] = []
+    risk_factors: RiskFactorsRead | None = None
 
 
 class FindingsResponse(BaseModel):
@@ -321,6 +340,192 @@ class FindingsResponse(BaseModel):
     # How many of the scan's findings are currently suppressed (baselined).
     suppressed_count: int = 0
     items: list[FindingRead]
+
+
+class TrendPoint(BaseModel):
+    """One scan's metrics as a point on the repository's timeline."""
+
+    scan_id: uuid.UUID
+    created_at: datetime
+    status: str
+    readiness: int
+    total_findings: int
+    severity_counts: dict[str, int] = {}
+    new_findings: int = 0
+    fixed_findings: int = 0
+    unchanged_findings: int = 0
+
+
+class TrendsResponse(BaseModel):
+    """Historical trend of a repository's scans, oldest first.
+
+    Points cover the repository's completed scans in chronological order so the
+    UI can chart readiness, findings and severity over time. new/fixed/unchanged
+    are relative to the immediately preceding completed scan (the first point has
+    everything as 'new').
+    """
+
+    repository_name: str
+    total_scans: int
+    points: list[TrendPoint] = []
+
+
+class RiskSummaryItem(BaseModel):
+    """A single finding as ranked by the deterministic risk engine."""
+
+    finding_id: uuid.UUID
+    rule_id: str
+    scanner: str
+    category: str
+    severity: str
+    confidence: str
+    title: str
+    file: str | None = None
+    line: int | None = None
+    risk_score: int
+    risk_priority: str
+    risk_explanation: str
+
+
+class DependencyItem(BaseModel):
+    """A single resolved dependency in the software bill of materials."""
+
+    name: str
+    version: str
+    ecosystem: str
+    scope: str  # "direct" | "transitive"
+    license: str | None = None
+    purl: str
+    sources: list[str] = []
+
+
+class DependenciesResponse(BaseModel):
+    """Dependency inventory for a scan (parsed from manifests/lockfiles).
+
+    `vulnerabilities_available` is false because no vulnerability database is
+    bundled - the severity buckets are therefore always zero and MUST NOT be
+    read as "no vulnerabilities". This is an inventory (SBOM), not a vuln scan.
+    """
+
+    scan_id: uuid.UUID
+    total: int
+    direct: int
+    transitive: int
+    ecosystem_counts: dict[str, int] = {}
+    vulnerabilities_available: bool = False
+    vulnerability_counts: dict[str, int] = {}
+    items: list[DependencyItem] = []
+
+
+class ContainerCategoryScore(BaseModel):
+    """A single container-security dimension's 0-100 score."""
+
+    key: str
+    label: str
+    score: int
+    findings: int
+    counts: dict[str, int] = {}
+    explanation: str
+
+
+class ContainerSecurityResponse(BaseModel):
+    """Container-security score for a scan (Docker + Compose).
+
+    `applicable` is false when the repository has no Dockerfile/Compose file, in
+    which case `overall` is 100. All scores are deterministic (0-100).
+    """
+
+    scan_id: uuid.UUID
+    applicable: bool
+    overall: int
+    total_findings: int = 0
+    categories: list[ContainerCategoryScore] = []
+
+
+class K8sCategoryScore(BaseModel):
+    """A single Kubernetes readiness dimension's 0-100 score."""
+
+    key: str
+    label: str
+    score: int
+    findings: int
+    counts: dict[str, int] = {}
+    explanation: str
+
+
+class KubernetesScoreResponse(BaseModel):
+    """Kubernetes production-readiness score for a scan.
+
+    `applicable` is false when the repository has no Kubernetes manifests, in
+    which case `overall` is 100 and categories carry no findings. All scores are
+    deterministic (0-100); no value comes from an LLM.
+    """
+
+    scan_id: uuid.UUID
+    applicable: bool
+    overall: int
+    total_findings: int = 0
+    categories: list[K8sCategoryScore] = []
+
+
+class PostureCategory(BaseModel):
+    """A single posture domain's deterministic 0-100 score."""
+
+    key: str
+    label: str
+    score: int
+    applicable: bool
+    findings: int
+    counts: dict[str, int] = {}
+    explanation: str
+
+
+class AffectedFile(BaseModel):
+    """A repository file ranked by how many findings it carries."""
+
+    file: str
+    findings: int
+    max_severity: str
+
+
+class PostureResponse(BaseModel):
+    """Security/DevOps posture overview for a scan.
+
+    `overall` is the deterministic production-readiness score (single source of
+    truth); `categories` are the per-domain scores. New/fixed/unchanged counts
+    come from the diff against the previous scan of the same repository (0 when
+    there is no prior scan). Active (non-suppressed) findings only.
+    """
+
+    scan_id: uuid.UUID
+    overall: int
+    ready: bool
+    categories: list[PostureCategory] = []
+    severity_counts: dict[str, int] = {}
+    total_findings: int = 0
+    new_findings: int = 0
+    fixed_findings: int = 0
+    unchanged_findings: int = 0
+    top_risk_areas: list[PostureCategory] = []
+    most_affected_files: list[AffectedFile] = []
+    recommendations: list[str] = []
+
+
+class RiskSummaryResponse(BaseModel):
+    """Deterministic risk overview for a scan (active findings only).
+
+    `counts` maps each priority band (immediate|high|normal|low) to how many
+    active findings fall in it. `top` lists the highest-risk findings first.
+    Suppressed (baselined) findings are excluded so accepted risks do not skew
+    the picture.
+    """
+
+    scan_id: uuid.UUID
+    total: int
+    counts: dict[str, int]
+    max_score: int = 0
+    average_score: float = 0.0
+    top: list[RiskSummaryItem] = []
 
 
 class SuppressRequest(BaseModel):
@@ -429,7 +634,8 @@ class RemediationResult(BaseModel):
 
     The patch is applied only to the stored repository copy - never to any
     user repository. After patching, the file is re-scanned to verify the
-    finding is genuinely resolved.
+    finding is genuinely resolved. `before_counts`/`after_counts` are the scan's
+    severity distribution immediately before and after this remediation.
     """
 
     finding_id: uuid.UUID
@@ -439,3 +645,37 @@ class RemediationResult(BaseModel):
     remaining_rule_ids: list[str] = Field(default_factory=list)
     diff: str | None = None
     message: str
+    severity: str | None = None
+    before_counts: dict[str, int] = Field(default_factory=dict)
+    after_counts: dict[str, int] = Field(default_factory=dict)
+
+
+class RemediationHistoryItem(BaseModel):
+    """One audit record of an approved remediation attempt."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    scan_id: uuid.UUID
+    finding_id: uuid.UUID
+    rule_id: str
+    scanner: str
+    file_path: str | None = None
+    severity: str
+    applied: bool
+    resolved: bool
+    remaining_rule_ids: list[str] = Field(default_factory=list)
+    diff: str | None = None
+    message: str
+    before_counts: dict[str, int] = Field(default_factory=dict)
+    after_counts: dict[str, int] = Field(default_factory=dict)
+    created_at: datetime
+
+
+class RemediationHistoryResponse(BaseModel):
+    """A scan's remediation history, most recent first."""
+
+    scan_id: uuid.UUID
+    total: int
+    resolved_count: int = 0
+    items: list[RemediationHistoryItem] = []

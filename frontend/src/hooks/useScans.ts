@@ -11,7 +11,13 @@ import type {
   RemediationProposal,
   RemediationResult,
   ReportModel,
+  ContainerSecurityResponse,
+  DependenciesResponse,
+  KubernetesScoreResponse,
+  PostureResponse,
+  RemediationHistoryResponse,
   RepositoryFileContent,
+  RiskSummaryResponse,
   ScanDiffResponse,
   ScanFilesResponse,
   ScanListResponse,
@@ -19,6 +25,7 @@ import type {
   StatsResponse,
   SuppressionRead,
   SuppressRequest,
+  TrendsResponse,
 } from "@/types/api";
 
 export function useStats() {
@@ -134,6 +141,54 @@ export function useFindings(scanId: string | null, filters: FindingFilters) {
   });
 }
 
+export function useRiskSummary(scanId: string | null) {
+  return useQuery<RiskSummaryResponse>({
+    queryKey: ["risk-summary", scanId],
+    queryFn: () => api.getRiskSummary(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function usePosture(scanId: string | null) {
+  return useQuery<PostureResponse>({
+    queryKey: ["posture", scanId],
+    queryFn: () => api.getPosture(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useTrends(scanId: string | null) {
+  return useQuery<TrendsResponse>({
+    queryKey: ["trends", scanId],
+    queryFn: () => api.getTrends(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useKubernetesScore(scanId: string | null) {
+  return useQuery<KubernetesScoreResponse>({
+    queryKey: ["kubernetes-score", scanId],
+    queryFn: () => api.getKubernetesScore(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useContainerSecurity(scanId: string | null) {
+  return useQuery<ContainerSecurityResponse>({
+    queryKey: ["container-security", scanId],
+    queryFn: () => api.getContainerSecurity(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
+export function useDependencies(scanId: string | null) {
+  return useQuery<DependenciesResponse>({
+    queryKey: ["dependencies", scanId],
+    queryFn: () => api.getDependencies(scanId as string),
+    enabled: Boolean(scanId),
+  });
+}
+
 export function useFileContent(scanId: string | null, fileId: string | null) {
   return useQuery<RepositoryFileContent>({
     queryKey: ["file-content", scanId, fileId],
@@ -165,8 +220,18 @@ export function useApplyRemediation(scanId: string, findingId: string) {
       void queryClient.invalidateQueries({ queryKey: ["file-content", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["files", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["report", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["posture", scanId] });
+      void queryClient.invalidateQueries({ queryKey: ["remediation-history", scanId] });
       void queryClient.invalidateQueries({ queryKey: ["stats"] });
     },
+  });
+}
+
+export function useRemediationHistory(scanId: string | null) {
+  return useQuery<RemediationHistoryResponse>({
+    queryKey: ["remediation-history", scanId],
+    queryFn: () => api.getRemediationHistory(scanId as string),
+    enabled: Boolean(scanId),
   });
 }
 

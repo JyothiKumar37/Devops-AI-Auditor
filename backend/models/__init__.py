@@ -13,6 +13,7 @@ from models.enums import (
     SuppressionReason,
 )
 from models.finding import Finding
+from models.remediation_history import RemediationHistory
 from models.scan import RepositoryFile, Scan
 from models.suppression import Suppression
 
@@ -23,6 +24,7 @@ __all__ = [
     "Confidence",
     "Finding",
     "FindingCategory",
+    "RemediationHistory",
     "RepositoryFile",
     "Scan",
     "ScannerType",

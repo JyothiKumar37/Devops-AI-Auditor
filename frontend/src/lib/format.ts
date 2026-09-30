@@ -61,6 +61,40 @@ export function prettyLabel(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Deterministic risk priority bands (mirrors backend services/risk.py).
+export const RISK_PRIORITY_ORDER = ["immediate", "high", "normal", "low"] as const;
+
+interface RiskPriorityMeta {
+  label: string;
+  badge: string;
+  dot: string;
+}
+
+const _RISK_LOW_META: RiskPriorityMeta = {
+  label: "Low",
+  badge: "bg-slate-100 text-slate-600 ring-slate-500/20",
+  dot: "bg-slate-400",
+};
+
+export const RISK_PRIORITY_META: Record<string, RiskPriorityMeta> = {
+  immediate: { label: "Immediate", badge: "bg-rose-50 text-rose-700 ring-rose-600/20", dot: "bg-rose-500" },
+  high: { label: "High", badge: "bg-orange-50 text-orange-700 ring-orange-600/20", dot: "bg-orange-500" },
+  normal: { label: "Normal", badge: "bg-amber-50 text-amber-700 ring-amber-600/20", dot: "bg-amber-500" },
+  low: _RISK_LOW_META,
+};
+
+export function riskPriorityMeta(priority: string): RiskPriorityMeta {
+  return RISK_PRIORITY_META[priority] ?? _RISK_LOW_META;
+}
+
+// Color for a 0-100 risk score (higher = more urgent = redder).
+export function riskScoreColor(score: number): string {
+  if (score >= 70) return "#e11d48"; // rose-600
+  if (score >= 45) return "#ea580c"; // orange-600
+  if (score >= 22) return "#d97706"; // amber-600
+  return "#64748b"; // slate-500
+}
+
 // Health color for a 0-100 score (green / amber / red), tuned for contrast on
 // a white background.
 export function scoreColor(score: number): string {
