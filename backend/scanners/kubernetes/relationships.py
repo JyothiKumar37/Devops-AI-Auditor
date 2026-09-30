@@ -25,6 +25,38 @@ def analyze_relationships(model: K8sModel, emit: Emitter) -> None:
     _check_ingresses(model, emit)
     _check_pdbs(model, emit)
     _check_hpas(model, emit)
+    _check_network_policies(model, emit)
+
+
+def _check_network_policies(model: K8sModel, emit: Emitter) -> None:
+    """Flag externally-exposed namespaces that ship no NetworkPolicy.
+
+    Bounded to one finding per namespace and only raised where there is genuine
+    EXTERNAL network surface - a LoadBalancer/NodePort Service or an Ingress -
+    and no NetworkPolicy at all. Internal ClusterIP-only namespaces are not
+    flagged, to stay evidence-based and avoid false positives.
+    """
+    ns_with_policy = {r.namespace for r in model.of_kind("NetworkPolicy")}
+    exposed_ns: set[str] = {
+        s.namespace
+        for s in model.of_kind("Service")
+        if str(_as_dict(s.raw.get("spec")).get("type", "ClusterIP")) in {"LoadBalancer", "NodePort"}
+    }
+    exposed_ns |= {ing.namespace for ing in model.of_kind("Ingress")}
+    seen: set[str] = set()
+    for workload in model.pod_owners:
+        ns = workload.namespace
+        if ns in seen or ns in ns_with_policy or ns not in exposed_ns:
+            continue
+        seen.add(ns)
+        emit.add(
+            "K8S042",
+            workload,
+            description=f"Namespace '{ns}' is externally exposed but defines no NetworkPolicy, "
+            "so pod-to-pod traffic is unrestricted.",
+            line=res_line(workload),
+            evidence=f"namespace={ns}",
+        )
 
 
 def _as_dict(value: Any) -> dict:

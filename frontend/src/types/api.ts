@@ -271,6 +271,18 @@ export type ConfidenceLevel = "low" | "medium" | "high";
 
 export type SuppressionReason = "false_positive" | "accepted_risk" | "wont_fix";
 
+export type RiskPriority = "immediate" | "high" | "normal" | "low";
+
+export interface RiskFactors {
+  severity_base: number;
+  exploitability: number;
+  exposure: number;
+  production_impact: number;
+  recurrence: number;
+  confidence_factor: number;
+  asset_criticality: number;
+}
+
 export interface Finding {
   id: string;
   scan_id: string;
@@ -288,6 +300,140 @@ export interface Finding {
   suppressed: boolean;
   suppression_reason: SuppressionReason | null;
   suppression_note: string | null;
+  // Deterministic risk prioritisation (annotated by the backend at read time).
+  risk_score: number;
+  risk_priority: RiskPriority;
+  risk_explanation: string;
+  risk_signals: string[];
+  risk_factors: RiskFactors | null;
+}
+
+export interface RiskSummaryItem {
+  finding_id: string;
+  rule_id: string;
+  scanner: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  file: string | null;
+  line: number | null;
+  risk_score: number;
+  risk_priority: RiskPriority;
+  risk_explanation: string;
+}
+
+export interface RiskSummaryResponse {
+  scan_id: string;
+  total: number;
+  counts: Record<RiskPriority, number>;
+  max_score: number;
+  average_score: number;
+  top: RiskSummaryItem[];
+}
+
+export interface TrendPoint {
+  scan_id: string;
+  created_at: string;
+  status: string;
+  readiness: number;
+  total_findings: number;
+  severity_counts: Record<string, number>;
+  new_findings: number;
+  fixed_findings: number;
+  unchanged_findings: number;
+}
+
+export interface TrendsResponse {
+  repository_name: string;
+  total_scans: number;
+  points: TrendPoint[];
+}
+
+export interface DependencyItem {
+  name: string;
+  version: string;
+  ecosystem: string;
+  scope: string;
+  license: string | null;
+  purl: string;
+  sources: string[];
+}
+
+export interface DependenciesResponse {
+  scan_id: string;
+  total: number;
+  direct: number;
+  transitive: number;
+  ecosystem_counts: Record<string, number>;
+  vulnerabilities_available: boolean;
+  vulnerability_counts: Record<string, number>;
+  items: DependencyItem[];
+}
+
+export interface ContainerCategoryScore {
+  key: string;
+  label: string;
+  score: number;
+  findings: number;
+  counts: Record<string, number>;
+  explanation: string;
+}
+
+export interface ContainerSecurityResponse {
+  scan_id: string;
+  applicable: boolean;
+  overall: number;
+  total_findings: number;
+  categories: ContainerCategoryScore[];
+}
+
+export interface K8sCategoryScore {
+  key: string;
+  label: string;
+  score: number;
+  findings: number;
+  counts: Record<string, number>;
+  explanation: string;
+}
+
+export interface KubernetesScoreResponse {
+  scan_id: string;
+  applicable: boolean;
+  overall: number;
+  total_findings: number;
+  categories: K8sCategoryScore[];
+}
+
+export interface PostureCategory {
+  key: string;
+  label: string;
+  score: number;
+  applicable: boolean;
+  findings: number;
+  counts: Record<string, number>;
+  explanation: string;
+}
+
+export interface AffectedFile {
+  file: string;
+  findings: number;
+  max_severity: string;
+}
+
+export interface PostureResponse {
+  scan_id: string;
+  overall: number;
+  ready: boolean;
+  categories: PostureCategory[];
+  severity_counts: Record<string, number>;
+  total_findings: number;
+  new_findings: number;
+  fixed_findings: number;
+  unchanged_findings: number;
+  top_risk_areas: PostureCategory[];
+  most_affected_files: AffectedFile[];
+  recommendations: string[];
 }
 
 export interface FindingsResponse {
@@ -354,6 +500,8 @@ export interface FindingFilters {
   scanner?: string;
   confidence?: string;
   file_type?: string;
+  priority?: string;
+  sort?: string;
 }
 
 // ---- Report model (services/report/model.py) ----
@@ -490,4 +638,32 @@ export interface RemediationResult {
   remaining_rule_ids: string[];
   diff: string | null;
   message: string;
+  severity: string | null;
+  before_counts: Record<string, number>;
+  after_counts: Record<string, number>;
+}
+
+export interface RemediationHistoryItem {
+  id: string;
+  scan_id: string;
+  finding_id: string;
+  rule_id: string;
+  scanner: string;
+  file_path: string | null;
+  severity: string;
+  applied: boolean;
+  resolved: boolean;
+  remaining_rule_ids: string[];
+  diff: string | null;
+  message: string;
+  before_counts: Record<string, number>;
+  after_counts: Record<string, number>;
+  created_at: string;
+}
+
+export interface RemediationHistoryResponse {
+  scan_id: string;
+  total: number;
+  resolved_count: number;
+  items: RemediationHistoryItem[];
 }

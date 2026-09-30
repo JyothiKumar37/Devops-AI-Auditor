@@ -429,10 +429,32 @@ def _iter_path_args(value: str) -> list[str]:
     return [t for t in tokens if not t.startswith("--")]
 
 
+def _is_world_writable_mode(mode: str) -> bool:
+    """True if a chmod mode grants write to 'other' (numeric or symbolic)."""
+    if mode.isdigit():
+        # Last octal digit is the 'other' triad; the write bit is value 2.
+        return int(mode[-1]) & 0o2 == 0o2
+    return any(sym in mode for sym in ("o+w", "a+w", "o=rw", "a=rw"))
+
+
 def _check_copy_add(df: Dockerfile, emit: _Emitter) -> None:
     for instr in df.instructions:
         if instr.cmd not in {"COPY", "ADD"}:
             continue
+
+        # World-writable --chmod grants any process write access to the copied
+        # files (a real hardening gap that the RUN 'chmod 777' check misses).
+        chmod = re.search(r"--chmod=(\S+)", instr.value)
+        if chmod and _is_world_writable_mode(chmod.group(1)):
+            emit.add(
+                "DCK014",
+                description=f"{instr.cmd} sets world-writable permissions via "
+                f"--chmod={chmod.group(1)}.",
+                line=instr.line,
+                evidence=f"{instr.cmd} {instr.value[:100]}",
+                severity=Severity.MEDIUM,
+            )
+
         args = _iter_path_args(instr.value)
         sources = args[:-1] if len(args) >= 2 else args
 

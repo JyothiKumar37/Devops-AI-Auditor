@@ -22,7 +22,13 @@ import type {
   RemediationProposal,
   RemediationResult,
   ReportModel,
+  ContainerSecurityResponse,
+  DependenciesResponse,
+  KubernetesScoreResponse,
+  PostureResponse,
+  RemediationHistoryResponse,
   RepositoryFileContent,
+  RiskSummaryResponse,
   ScanDiffResponse,
   ScanFilesResponse,
   ScanListResponse,
@@ -30,6 +36,7 @@ import type {
   StatsResponse,
   SuppressionRead,
   SuppressRequest,
+  TrendsResponse,
 } from "@/types/api";
 
 const API_V1 = "/api/v1";
@@ -228,6 +235,24 @@ export const api = {
   /** Fetch findings for a scan with optional filters. */
   getFindings: (id: string, filters: FindingFilters = {}) =>
     request<FindingsResponse>(`${API_V1}/scans/${id}/findings${query({ ...filters, limit: "2000" })}`),
+  /** Deterministic risk-prioritisation overview for a scan. */
+  getRiskSummary: (id: string) =>
+    request<RiskSummaryResponse>(`${API_V1}/scans/${id}/risk-summary`),
+  /** Security/DevOps posture overview (per-domain scores) for a scan. */
+  getPosture: (id: string) => request<PostureResponse>(`${API_V1}/scans/${id}/posture`),
+  /** Historical trend across the repository's completed scans. */
+  getTrends: (id: string) => request<TrendsResponse>(`${API_V1}/scans/${id}/trends`),
+  /** Kubernetes production-readiness score (six dimensions) for a scan. */
+  getKubernetesScore: (id: string) =>
+    request<KubernetesScoreResponse>(`${API_V1}/scans/${id}/kubernetes-score`),
+  /** Container-security score (Docker + Compose) for a scan. */
+  getContainerSecurity: (id: string) =>
+    request<ContainerSecurityResponse>(`${API_V1}/scans/${id}/container-security`),
+  /** Dependency inventory (SBOM components) for a scan. */
+  getDependencies: (id: string) =>
+    request<DependenciesResponse>(`${API_V1}/scans/${id}/dependencies`),
+  /** URL to download the CycloneDX SBOM for a scan. */
+  sbomDownloadUrl: (id: string) => `${API_V1}/scans/${id}/sbom?download=true`,
   /** Fetch the AI reasoning report (production readiness, groups, recommendations). */
   getReport: (id: string) => request<AuditReport>(`${API_V1}/scans/${id}/report`),
   /** URL that exports the full audit report in the given format (json|html|pdf). */
@@ -249,6 +274,9 @@ export const api = {
     post<RemediationResult>(
       `${API_V1}/scans/${scanId}/findings/${findingId}/remediation/apply`,
     ),
+  /** Immutable audit trail of applied remediations for a scan. */
+  getRemediationHistory: (id: string) =>
+    request<RemediationHistoryResponse>(`${API_V1}/scans/${id}/remediation-history`),
   /** Suppress (baseline) a finding for its repository. */
   suppressFinding: (scanId: string, findingId: string, payload: SuppressRequest) =>
     postJson<SuppressionRead>(

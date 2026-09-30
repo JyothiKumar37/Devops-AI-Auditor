@@ -3,9 +3,11 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
 import Dashboard from "@/pages/Dashboard";
+import Dependencies from "@/pages/Dependencies";
 import FindingDetails from "@/pages/FindingDetails";
 import Findings from "@/pages/Findings";
 import NewScan from "@/pages/NewScan";
+import Posture from "@/pages/Posture";
 import Readiness from "@/pages/Readiness";
 import ReportView from "@/pages/ReportView";
 import RepositoryFiles from "@/pages/RepositoryFiles";
@@ -15,6 +17,7 @@ import ScanHistory from "@/pages/ScanHistory";
 import ScanLayout from "@/pages/ScanLayout";
 import ScanOverview from "@/pages/ScanOverview";
 import Settings from "@/pages/Settings";
+import Trends from "@/pages/Trends";
 
 export default function App() {
   const location = useLocation();
@@ -29,6 +32,9 @@ export default function App() {
           <Route index element={<ScanOverview />} />
           <Route path="findings" element={<Findings />} />
           <Route path="findings/:findingId" element={<FindingDetails />} />
+          <Route path="posture" element={<Posture />} />
+          <Route path="trends" element={<Trends />} />
+          <Route path="dependencies" element={<Dependencies />} />
           <Route path="files" element={<RepositoryFiles />} />
           <Route path="readiness" element={<Readiness />} />
           <Route path="diff" element={<ScanDiff />} />

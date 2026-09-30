@@ -9,6 +9,9 @@ import { prettyLabel, relativeTime } from "@/lib/format";
 const TABS = [
   { to: "", label: "Overview", end: true, key: "overview" as const },
   { to: "findings", label: "Findings", key: "findings" as const },
+  { to: "posture", label: "Posture", key: "posture" as const },
+  { to: "trends", label: "Trends", key: "trends" as const },
+  { to: "dependencies", label: "Dependencies", key: "dependencies" as const },
   { to: "files", label: "Files", key: "files" as const },
   { to: "readiness", label: "Readiness", key: "readiness" as const },
   { to: "diff", label: "Diff", key: "diff" as const },

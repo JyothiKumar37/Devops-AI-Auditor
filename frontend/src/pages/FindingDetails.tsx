@@ -14,8 +14,47 @@ import {
   useUnsuppressFinding,
 } from "@/hooks/useScans";
 import { useExplainFinding, useSuggestFix, useTriageFinding } from "@/hooks/useAi";
-import { prettyLabel } from "@/lib/format";
-import type { SuppressionReason } from "@/types/api";
+import { SEVERITY_ORDER, prettyLabel, riskPriorityMeta, riskScoreColor, severityMeta } from "@/lib/format";
+import type { RemediationResult, SuppressionReason } from "@/types/api";
+
+function BeforeAfter({ result }: { result: RemediationResult }) {
+  const before = result.before_counts ?? {};
+  const after = result.after_counts ?? {};
+  const totalBefore = Object.values(before).reduce((a, b) => a + b, 0);
+  const totalAfter = Object.values(after).reduce((a, b) => a + b, 0);
+  const fixed = Math.max(0, totalBefore - totalAfter);
+  return (
+    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Scan findings — before / after
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {SEVERITY_ORDER.map((sev) => {
+          const b = before[sev] ?? 0;
+          const a = after[sev] ?? 0;
+          if (b === 0 && a === 0) return null;
+          const meta = severityMeta(sev);
+          const changed = a !== b;
+          return (
+            <span
+              key={sev}
+              className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs ring-1 ring-inset ${meta.badge}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden />
+              {meta.label}: <span className="font-mono">{b}</span>
+              <span aria-hidden>→</span>
+              <span className={`font-mono font-bold ${changed ? "text-emerald-700" : ""}`}>{a}</span>
+            </span>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        <span className="font-semibold text-emerald-700">{fixed} fixed</span> · {totalAfter} still
+        present · 0 new
+      </p>
+    </div>
+  );
+}
 
 const REASON_LABELS: Record<SuppressionReason, string> = {
   false_positive: "False positive",
@@ -111,6 +150,7 @@ export default function FindingDetails() {
             The fix was applied to the stored analysis copy only — your repository was never
             modified — and the {applied.rule_id} finding no longer triggers on re-scan.
           </p>
+          <BeforeAfter result={applied} />
           {applied.diff ? <DiffView diff={applied.diff} /> : null}
         </Card>
       </div>
@@ -172,6 +212,33 @@ export default function FindingDetails() {
             ) : null}
             {aiReasoning ? <Section title="AI reasoning">{aiReasoning}</Section> : null}
             <Section title="Recommendation">{finding.recommendation}</Section>
+            <div>
+              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Risk priority
+              </h3>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-8 w-11 items-center justify-center rounded-md text-sm font-bold tabular-nums text-white"
+                  style={{ background: riskScoreColor(finding.risk_score) }}
+                >
+                  {finding.risk_score}
+                </span>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${
+                    riskPriorityMeta(finding.risk_priority).badge
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${riskPriorityMeta(finding.risk_priority).dot}`}
+                    aria-hidden
+                  />
+                  {riskPriorityMeta(finding.risk_priority).label}
+                </span>
+              </div>
+              {finding.risk_explanation ? (
+                <p className="mt-1.5 text-xs text-slate-500">{finding.risk_explanation}</p>
+              ) : null}
+            </div>
             <div className="flex flex-wrap gap-6 pt-1 text-xs text-slate-500">
               <span>Category: {prettyLabel(finding.category)}</span>
               <span>Confidence: {prettyLabel(finding.confidence)}</span>
