@@ -40,15 +40,18 @@ def configure_logging(settings: Settings) -> None:
             renderer,
         ],
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
-        logger_factory=structlog.PrintLoggerFactory(),
+        # Logs go to stderr; stdout is reserved for program output (e.g. the CLI
+        # emits machine-readable JSON/SARIF there, which log lines must not corrupt).
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,
     )
 
-    # Route stdlib logging (uvicorn, sqlalchemy, etc.) through the same level.
+    # Route stdlib logging (uvicorn, sqlalchemy, etc.) through the same level,
+    # also to stderr so it never mixes with program output on stdout.
     logging.basicConfig(
         format="%(message)s",
         level=log_level,
-        handlers=[logging.StreamHandler(sys.stdout)],
+        handlers=[logging.StreamHandler(sys.stderr)],
         force=True,
     )
 

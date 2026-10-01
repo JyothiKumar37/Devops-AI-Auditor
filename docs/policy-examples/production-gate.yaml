@@ -1,0 +1,27 @@
+# Strict production gate: block any critical, any NEW high, and secrets.
+# Use for protected branches / production environments.
+version: 1
+name: production-gate
+description: Block merges that introduce critical/high risk or secrets.
+rules:
+  - id: no-critical
+    condition:
+      severity: critical
+    action: fail
+
+  - id: no-new-high
+    condition:
+      severity: high
+      is_new: true
+    action: fail
+
+  - id: block-secrets
+    condition:
+      scanner: gitleaks
+    action: fail
+
+  - id: warn-medium
+    condition:
+      severity: medium
+      is_new: true
+    action: warn

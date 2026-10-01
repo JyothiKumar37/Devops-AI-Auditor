@@ -4,7 +4,28 @@
 
 import type {
   ApiErrorBody,
+  AuditLogListResponse,
   AuditReport,
+  Integration,
+  IntegrationConnectRequest,
+  IntegrationListResponse,
+  NotificationChannel,
+  NotificationChannelCreateRequest,
+  NotificationChannelListResponse,
+  NotificationChannelUpdateRequest,
+  NotificationDelivery,
+  Policy,
+  PolicyAssignRequest,
+  PolicyCreateRequest,
+  PolicyEvaluationResult,
+  PolicyListResponse,
+  PolicyUpdateRequest,
+  PolicyVersion,
+  PullRequestDetail,
+  PullRequestListResponse,
+  RemoteRepositoryListResponse,
+  SCMRepository,
+  SCMRepositoryListResponse,
   DiscoveryResponse,
   FindingFilters,
   FindingsResponse,
@@ -286,5 +307,62 @@ export const api = {
   /** Remove a finding's baseline (un-suppress). */
   unsuppressFinding: (scanId: string, findingId: string) =>
     del(`${API_V1}/scans/${scanId}/findings/${findingId}/suppress`),
+
+  // ---- Phase 2: integrations ----
+  /** List connected SCM integrations (tokens are never returned). */
+  listIntegrations: () => request<IntegrationListResponse>(`${API_V1}/integrations`),
+  /** Connect an SCM provider with a personal access token (stored encrypted). */
+  connectIntegration: (payload: IntegrationConnectRequest) =>
+    postJson<Integration>(`${API_V1}/integrations`, payload),
+  /** Disconnect an integration. */
+  deleteIntegration: (id: string) => del(`${API_V1}/integrations/${id}`),
+  /** List imported repositories tracked for PR scanning. */
+  listRepositories: () => request<SCMRepositoryListResponse>(`${API_V1}/integrations/repositories`),
+  /** List repositories visible to an integration's token (live). */
+  listRemoteRepositories: (id: string) =>
+    request<RemoteRepositoryListResponse>(`${API_V1}/integrations/${id}/repositories`),
+  /** Import a repository from an integration for PR scanning. */
+  importRepository: (id: string, owner: string, name: string) =>
+    postJson<SCMRepository>(`${API_V1}/integrations/${id}/repositories/import`, { owner, name }),
+
+  // ---- Phase 2: pull requests ----
+  /** List tracked pull/merge requests (optionally filtered by repo). */
+  listPullRequests: (repo?: string) =>
+    request<PullRequestListResponse>(`${API_V1}/pull-requests${query({ repo })}`),
+  /** Fetch a pull request with its scan history. */
+  getPullRequest: (id: string) =>
+    request<PullRequestDetail>(`${API_V1}/pull-requests/${id}`),
+
+  // ---- Phase 2: policies ----
+  listPolicies: () => request<PolicyListResponse>(`${API_V1}/policies`),
+  getPolicy: (id: string) => request<Policy>(`${API_V1}/policies/${id}`),
+  createPolicy: (payload: PolicyCreateRequest) => postJson<Policy>(`${API_V1}/policies`, payload),
+  updatePolicy: (id: string, payload: PolicyUpdateRequest) =>
+    putJson<Policy>(`${API_V1}/policies/${id}`, payload),
+  deletePolicy: (id: string) => del(`${API_V1}/policies/${id}`),
+  getPolicyVersions: (id: string) =>
+    request<PolicyVersion[]>(`${API_V1}/policies/${id}/versions`),
+  assignPolicy: (id: string, payload: PolicyAssignRequest) =>
+    postJson<Policy>(`${API_V1}/policies/${id}/assign`, payload),
+  evaluatePolicy: (id: string, payload: { scan_id?: string; findings?: unknown[]; environment?: string }) =>
+    postJson<PolicyEvaluationResult>(`${API_V1}/policies/${id}/evaluate`, payload),
+
+  // ---- Phase 2: notifications ----
+  listNotificationChannels: () =>
+    request<NotificationChannelListResponse>(`${API_V1}/notifications`),
+  createNotificationChannel: (payload: NotificationChannelCreateRequest) =>
+    postJson<NotificationChannel>(`${API_V1}/notifications`, payload),
+  updateNotificationChannel: (id: string, payload: NotificationChannelUpdateRequest) =>
+    putJson<NotificationChannel>(`${API_V1}/notifications/${id}`, payload),
+  deleteNotificationChannel: (id: string) => del(`${API_V1}/notifications/${id}`),
+  testNotificationChannel: (id: string) =>
+    postJson<NotificationDelivery>(`${API_V1}/notifications/${id}/test`, {}),
+  listNotificationDeliveries: () =>
+    request<NotificationDelivery[]>(`${API_V1}/notifications/deliveries`),
+
+  // ---- Phase 2: audit log ----
+  listAuditLogs: (params: { action?: string; resource_type?: string } = {}) =>
+    request<AuditLogListResponse>(`${API_V1}/audit-logs${query(params)}`),
+
   uploadScan,
 };

@@ -1,0 +1,22 @@
+# Lenient baseline for non-production repositories: warn on risk, never block
+# except for high-confidence secrets. Good as a starting global policy.
+version: 1
+name: baseline
+description: Warn on significant risk; block only leaked secrets.
+rules:
+  - id: block-secrets
+    condition:
+      scanner: gitleaks
+      confidence: high
+    action: fail
+
+  - id: warn-high-risk
+    condition:
+      min_risk_score: 70
+    action: warn
+
+  - id: warn-iac-critical
+    condition:
+      severity: critical
+      path: "*.tf"
+    action: warn

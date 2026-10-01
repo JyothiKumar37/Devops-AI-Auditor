@@ -1,0 +1,21 @@
+// DevOps AI Auditor - Jenkins pipeline example.
+// Exit codes: 0 = pass, 1 = security/policy failure, 2 = runtime/config error.
+pipeline {
+  agent any
+  stages {
+    stage('Security Audit') {
+      steps {
+        sh 'pip install ./backend'
+        // sh returns the command's exit code; a non-zero code fails the stage.
+        sh 'devops-auditor scan . --format sarif --output results.sarif'
+        // Or gate on a policy:
+        // sh 'devops-auditor policy check . --policy .devops-auditor/policy.yaml'
+      }
+    }
+  }
+  post {
+    always {
+      archiveArtifacts artifacts: 'results.sarif', allowEmptyArchive: true
+    }
+  }
+}

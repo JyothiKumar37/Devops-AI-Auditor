@@ -667,3 +667,227 @@ export interface RemediationHistoryResponse {
   resolved_count: number;
   items: RemediationHistoryItem[];
 }
+
+
+// ---- Phase 2: integrations, pull requests, policies, notifications, audit ----
+
+export type SCMProviderName = "github" | "gitlab";
+
+export interface Integration {
+  id: string;
+  provider: SCMProviderName;
+  account: string | null;
+  name: string;
+  status: string;
+  api_url: string;
+  created_at: string;
+}
+
+export interface IntegrationListResponse {
+  total: number;
+  items: Integration[];
+}
+
+export interface IntegrationConnectRequest {
+  provider: SCMProviderName;
+  token: string;
+  name?: string | null;
+}
+
+export interface RemoteRepository {
+  external_id: string;
+  owner: string;
+  name: string;
+  full_name: string;
+  default_branch: string;
+  web_url: string;
+  private: boolean;
+}
+
+export interface RemoteRepositoryListResponse {
+  total: number;
+  items: RemoteRepository[];
+}
+
+export interface SCMRepository {
+  id: string;
+  integration_id: string;
+  provider: SCMProviderName;
+  owner: string;
+  name: string;
+  full_name: string;
+  default_branch: string;
+  web_url: string;
+  private: boolean;
+  policy_id: string | null;
+  created_at: string;
+}
+
+export interface SCMRepositoryListResponse {
+  total: number;
+  items: SCMRepository[];
+}
+
+export interface RepositoryImportRequest {
+  owner: string;
+  name: string;
+}
+
+// ---- Policies ----
+
+export interface Policy {
+  id: string;
+  name: string;
+  description: string;
+  yaml_text: string;
+  version: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyListResponse {
+  total: number;
+  items: Policy[];
+}
+
+export interface PolicyCreateRequest {
+  name: string;
+  yaml_text: string;
+  description?: string;
+}
+
+export interface PolicyUpdateRequest {
+  yaml_text?: string;
+  description?: string;
+  enabled?: boolean;
+}
+
+export interface PolicyVersion {
+  version: number;
+  yaml_text: string;
+  created_at: string;
+}
+
+export interface PolicyAssignRequest {
+  scope_type: "repo" | "global";
+  scope_value?: string;
+  environment?: string | null;
+}
+
+export interface PolicyEvaluationResult {
+  status: "pass" | "warning" | "fail";
+  rules: Array<Record<string, unknown>>;
+  violations: Array<Record<string, unknown>>;
+}
+
+// ---- Pull requests ----
+
+export type GateStatus = "pass" | "warning" | "fail";
+
+export interface PullRequestScan {
+  id: string;
+  pull_request_id: string;
+  head_sha: string;
+  status: string;
+  changed_files: number;
+  new_findings: number;
+  fixed_findings: number;
+  pr_risk_score: number;
+  readiness_before: number;
+  readiness_after: number;
+  gate_status: GateStatus;
+  severity_delta: Record<string, number> | null;
+  findings_detail: Array<Record<string, unknown>> | null;
+  policy_result: Record<string, unknown> | null;
+  summary: string;
+  created_at: string;
+}
+
+export interface PullRequest {
+  id: string;
+  provider: SCMProviderName;
+  repo_full_name: string;
+  number: number;
+  title: string;
+  author: string;
+  base_ref: string;
+  head_ref: string;
+  head_sha: string;
+  web_url: string;
+  state: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PullRequestListResponse {
+  total: number;
+  items: PullRequest[];
+}
+
+export interface PullRequestDetail {
+  pull_request: PullRequest;
+  latest_scan: PullRequestScan | null;
+  scans: PullRequestScan[];
+}
+
+// ---- Notifications ----
+
+export type NotificationChannelType = "slack" | "teams" | "webhook" | "email";
+
+export interface NotificationChannel {
+  id: string;
+  type: NotificationChannelType;
+  name: string;
+  enabled: boolean;
+  events: string[];
+  config: Record<string, unknown>; // masked - never contains full secrets
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationChannelListResponse {
+  total: number;
+  items: NotificationChannel[];
+}
+
+export interface NotificationChannelCreateRequest {
+  type: NotificationChannelType;
+  name: string;
+  config: Record<string, unknown>;
+  events: string[];
+}
+
+export interface NotificationChannelUpdateRequest {
+  name?: string;
+  config?: Record<string, unknown>;
+  events?: string[];
+  enabled?: boolean;
+}
+
+export interface NotificationDelivery {
+  id: string;
+  channel_id: string;
+  event_type: string;
+  status: "sent" | "failed";
+  error: string | null;
+  created_at: string;
+}
+
+// ---- Audit log ----
+
+export interface AuditLog {
+  id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  actor: string;
+  status: string;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AuditLogListResponse {
+  total: number;
+  items: AuditLog[];
+}

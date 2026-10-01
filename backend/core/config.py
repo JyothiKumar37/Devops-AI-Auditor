@@ -166,6 +166,36 @@ class Settings(BaseSettings):
     # Timeout (seconds) for any external scanner invocation.
     external_tool_timeout: int = 120
 
+    # ---- Phase 2: SCM integrations, webhooks, notifications ----
+    # Fernet key (urlsafe base64, 32 bytes) used to encrypt stored SCM access
+    # tokens at rest. Generate with: python -c "from cryptography.fernet import
+    # Fernet; print(Fernet.generate_key().decode())". When empty, SCM integration
+    # endpoints are disabled (tokens are NEVER stored in plaintext).
+    integration_encryption_key: str = Field(default="", repr=False)
+    # Default API base URLs (overridable for GitHub Enterprise / self-hosted GitLab).
+    github_api_url: str = "https://api.github.com"
+    gitlab_api_url: str = "https://gitlab.com/api/v4"
+    # Shared webhook secrets (used when registering/validating webhooks if a
+    # per-integration secret is not stored). Per-integration secrets are preferred.
+    github_webhook_secret: str = Field(default="", repr=False)
+    gitlab_webhook_secret: str = Field(default="", repr=False)
+    # Public base URL of this auditor, used when generating webhook callback URLs
+    # and PR "view scan" links (e.g. https://auditor.example.com).
+    public_base_url: str = ""
+    # Max accepted webhook payload size (bytes) - defends against oversized posts.
+    webhook_max_body_bytes: int = 1_000_000
+
+    # ---- Notifications (optional; each channel is configured per-record too) ----
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = Field(default="", repr=False)
+    smtp_from: str = "devops-auditor@localhost"
+    smtp_use_tls: bool = True
+    # When false, outbound notification webhooks may target private/loopback hosts
+    # (enabled only by the test suite). Production keeps SSRF protection on.
+    notifications_allow_private_hosts: bool = False
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def cors_origins_list(self) -> list[str]:

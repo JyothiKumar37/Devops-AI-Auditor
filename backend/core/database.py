@@ -75,8 +75,13 @@ class Database:
         """
         # Import models so they register on the metadata before create_all.
         from models import app_setting as _app_setting  # noqa: F401
+        from models import audit as _audit  # noqa: F401
         from models import chat as _chat  # noqa: F401
         from models import finding as _finding  # noqa: F401
+        from models import integration as _integration  # noqa: F401
+        from models import notification as _notification  # noqa: F401
+        from models import policy as _policy  # noqa: F401
+        from models import pullrequest as _pullrequest  # noqa: F401
         from models import remediation_history as _remediation_history  # noqa: F401
         from models import scan as _scan  # noqa: F401
         from models import suppression as _suppression  # noqa: F401

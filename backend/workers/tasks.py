@@ -64,3 +64,34 @@ def run_git_scan(scan_id: str, repository_url: str, ref: str | None = None) -> N
         )
     except Exception:  # noqa: BLE001 - the pipeline records FAILED; log and move on
         logger.exception("run_git_scan_failed", scan_id=scan_id)
+
+
+@celery_app.task(name="workers.run_pr_scan")
+def run_pr_scan(
+    provider: str, integration_id: str, repo_full_name: str, pr_number: int
+) -> None:
+    """Run an incremental scan + PR feedback for a webhook-triggered PR."""
+
+    async def _run() -> None:
+        from core.config import get_settings
+        from core.database import Database
+        from services.pr_feedback_service import PRFeedbackService
+
+        settings = get_settings()
+        database = Database(settings)
+        try:
+            async with database.sessionmaker() as session:
+                feedback = PRFeedbackService(session=session, settings=settings)
+                await feedback.scan_and_report(
+                    provider, uuid.UUID(integration_id), repo_full_name, pr_number
+                )
+                await session.commit()
+        finally:
+            await database.dispose()
+
+    try:
+        asyncio.run(_run())
+    except Exception:  # noqa: BLE001 - log and move on; the webhook already returned 202
+        logger.exception(
+            "run_pr_scan_failed", repo=repo_full_name, pr=pr_number, provider=provider
+        )

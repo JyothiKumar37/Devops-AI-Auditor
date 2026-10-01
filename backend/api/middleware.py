@@ -50,6 +50,9 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         self._api_key = settings.api_key
         self._api_prefix = settings.api_v1_prefix.rstrip("/")
         self._health_prefix = f"{self._api_prefix}/health"
+        # Inbound SCM webhooks are called by GitHub/GitLab, which cannot send our
+        # API key; they are authenticated by signature verification instead.
+        self._webhook_prefix = f"{self._api_prefix}/webhooks"
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -73,8 +76,11 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         if not path.startswith(self._api_prefix):
             return False  # docs, openapi, root, static
-        # Liveness/readiness probes stay open; everything else needs a key.
-        return not path.startswith(self._health_prefix)
+        # Health probes and signature-verified webhooks stay open to the API key.
+        return not (
+            path.startswith(self._health_prefix)
+            or path.startswith(self._webhook_prefix)
+        )
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

@@ -1,0 +1,39 @@
+# DevOps AI Auditor - GitHub Actions example
+# Runs the CLI on every push/PR and fails the build on policy/security failure.
+# Exit codes: 0 = pass, 1 = security/policy failure, 2 = runtime/config error.
+name: devops-ai-auditor
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for --changed (diff against history)
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install DevOps AI Auditor
+        run: pip install ./backend
+
+      # Fail the job on any new high/critical finding (default --fail-on high).
+      - name: Scan
+        run: devops-auditor scan . --format sarif --output results.sarif
+        continue-on-error: false
+
+      # Optional: gate on a committed policy instead of a severity threshold.
+      # - name: Policy check
+      #   run: devops-auditor policy check . --policy .devops-auditor/policy.yaml
+
+      # Upload SARIF to GitHub code scanning (optional).
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

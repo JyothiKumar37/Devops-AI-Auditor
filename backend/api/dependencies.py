@@ -19,6 +19,7 @@ from core.config import Settings
 from core.database import Database
 from core.redis import RedisClient
 from services.health_service import HealthService
+from services.integration_service import IntegrationService
 from services.remediation_service import RemediationService
 from services.report import ReportService
 from services.scan_service import ScanService
@@ -99,3 +100,12 @@ def get_ai_assist_service(session: DbSessionDep, settings: SettingsDep) -> AiAss
 
 
 AiAssistServiceDep = Annotated[AiAssistService, Depends(get_ai_assist_service)]
+
+
+def get_integration_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> IntegrationService:
+    return IntegrationService(session=session, settings=settings)
+
+
+IntegrationServiceDep = Annotated[IntegrationService, Depends(get_integration_service)]

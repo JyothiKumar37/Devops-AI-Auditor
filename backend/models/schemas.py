@@ -387,6 +387,192 @@ class RiskSummaryItem(BaseModel):
     risk_explanation: str
 
 
+class IntegrationConnectRequest(BaseModel):
+    """Connect an SCM provider with an access token (PAT or App token)."""
+
+    provider: str  # github | gitlab
+    token: str
+    name: str | None = None
+
+
+class IntegrationRead(BaseModel):
+    """A connected integration. The access token is NEVER included."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    provider: str
+    account: str | None = None
+    name: str
+    status: str
+    api_url: str
+    created_at: datetime
+
+
+class IntegrationListResponse(BaseModel):
+    total: int
+    items: list[IntegrationRead] = []
+
+
+class RemoteRepository(BaseModel):
+    """A repository as listed live from a provider (not yet imported)."""
+
+    external_id: str
+    owner: str
+    name: str
+    full_name: str
+    default_branch: str
+    web_url: str
+    private: bool
+
+
+class RemoteRepositoryListResponse(BaseModel):
+    total: int
+    items: list[RemoteRepository] = []
+
+
+class RepositoryImportRequest(BaseModel):
+    owner: str
+    name: str
+
+
+class SCMRepositoryRead(BaseModel):
+    """An imported repository tracked for PR scanning."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    integration_id: uuid.UUID
+    provider: str
+    owner: str
+    name: str
+    full_name: str
+    default_branch: str
+    web_url: str
+    private: bool
+    policy_id: uuid.UUID | None = None
+    created_at: datetime
+
+
+class SCMRepositoryListResponse(BaseModel):
+    total: int
+    items: list[SCMRepositoryRead] = []
+
+
+class PolicyCreateRequest(BaseModel):
+    name: str
+    yaml_text: str
+    description: str = ""
+
+
+class PolicyUpdateRequest(BaseModel):
+    yaml_text: str | None = None
+    description: str | None = None
+    enabled: bool | None = None
+
+
+class PolicyRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    name: str
+    description: str
+    yaml_text: str
+    version: int
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class PolicyListResponse(BaseModel):
+    total: int
+    items: list[PolicyRead] = []
+
+
+class PolicyVersionRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    version: int
+    yaml_text: str
+    created_at: datetime
+
+
+class PolicyAssignRequest(BaseModel):
+    scope_type: str  # repo | global
+    scope_value: str = ""
+    environment: str | None = None
+
+
+class PolicyEvaluateRequest(BaseModel):
+    """Evaluate a policy against a scan's findings or an inline finding list."""
+
+    scan_id: uuid.UUID | None = None
+    findings: list[dict] | None = None
+    environment: str | None = None
+
+
+class PolicyEvaluationResult(BaseModel):
+    status: str
+    rules: list[dict] = []
+    violations: list[dict] = []
+
+
+class PullRequestScanRead(BaseModel):
+    """The deterministic result of one incremental PR scan."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    pull_request_id: uuid.UUID
+    head_sha: str
+    status: str
+    changed_files: int
+    new_findings: int
+    fixed_findings: int
+    pr_risk_score: int
+    readiness_before: int
+    readiness_after: int
+    gate_status: str
+    severity_delta: dict[str, int] | None = None
+    findings_detail: list[dict] | None = None
+    policy_result: dict | None = None
+    summary: str = ""
+    created_at: datetime
+
+
+class PullRequestRead(BaseModel):
+    """A tracked pull/merge request."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    provider: str
+    repo_full_name: str
+    number: int
+    title: str
+    author: str
+    base_ref: str
+    head_ref: str
+    head_sha: str
+    web_url: str
+    state: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class PullRequestListResponse(BaseModel):
+    total: int
+    items: list[PullRequestRead] = []
+
+
+class PullRequestDetail(BaseModel):
+    """A pull request plus its scan history (most recent first)."""
+
+    pull_request: PullRequestRead
+    latest_scan: PullRequestScanRead | None = None
+    scans: list[PullRequestScanRead] = []
+
+
 class DependencyItem(BaseModel):
     """A single resolved dependency in the software bill of materials."""
 
@@ -679,3 +865,77 @@ class RemediationHistoryResponse(BaseModel):
     total: int
     resolved_count: int = 0
     items: list[RemediationHistoryItem] = []
+
+
+# ---- Notifications ---------------------------------------------------------
+
+
+class NotificationChannelCreateRequest(BaseModel):
+    """Create a notification channel. ``config`` holds provider-specific fields.
+
+    - slack/teams: {"webhook_url": "https://..."}
+    - webhook:     {"url": "https://...", "secret": "optional"}
+    - email:       {"recipients": ["a@b.com", ...]}
+    """
+
+    type: str  # slack | teams | webhook | email
+    name: str
+    config: dict = {}
+    events: list[str] = []
+
+
+class NotificationChannelUpdateRequest(BaseModel):
+    name: str | None = None
+    config: dict | None = None
+    events: list[str] | None = None
+    enabled: bool | None = None
+
+
+class NotificationChannelRead(BaseModel):
+    """A channel as returned by the API. Secret config values are masked."""
+
+    id: uuid.UUID
+    type: str
+    name: str
+    enabled: bool
+    events: list[str] = []
+    config: dict = {}  # masked - never contains full secrets
+    created_at: datetime
+    updated_at: datetime
+
+
+class NotificationChannelListResponse(BaseModel):
+    total: int
+    items: list[NotificationChannelRead] = []
+
+
+class NotificationDeliveryRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    channel_id: uuid.UUID
+    event_type: str
+    status: str
+    error: str | None = None
+    created_at: datetime
+
+
+# ---- Audit log -------------------------------------------------------------
+
+
+class AuditLogRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    action: str
+    resource_type: str
+    resource_id: str | None = None
+    actor: str
+    status: str
+    detail: dict | None = None
+    created_at: datetime
+
+
+class AuditLogListResponse(BaseModel):
+    total: int
+    items: list[AuditLogRead] = []

@@ -1,0 +1,21 @@
+# DevOps AI Auditor - GitLab CI example
+# Exit codes: 0 = pass, 1 = security/policy failure, 2 = runtime/config error.
+stages:
+  - security
+
+devops-ai-auditor:
+  stage: security
+  image: python:3.11-slim
+  before_script:
+    - pip install ./backend
+  script:
+    # Fails the pipeline (exit 1) on any new high/critical finding.
+    - devops-auditor scan . --format sarif --output gl-sast-report.json
+    # Or gate on a policy:
+    # - devops-auditor policy check . --policy .devops-auditor/policy.yaml
+  artifacts:
+    when: always
+    paths:
+      - gl-sast-report.json
+    reports:
+      sast: gl-sast-report.json

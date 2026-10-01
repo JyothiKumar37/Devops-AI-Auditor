@@ -26,6 +26,7 @@ dependencies = [
     "PyYAML==6.0.2",
     "python-hcl2==4.3.5",
     "reportlab==4.2.5",
+    "cryptography==44.0.0",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +39,12 @@ dev = [
     "aiosqlite==0.20.0",
     "pip-audit==2.7.3",
 ]
+
+[project.scripts]
+devops-auditor = "cli:main"
+
+[tool.setuptools]
+py-modules = ["cli"]
 
 [tool.setuptools.packages.find]
 # The project uses top-level package directories (api, agents, ...) rather than

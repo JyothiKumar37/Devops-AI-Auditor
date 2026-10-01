@@ -2,12 +2,18 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
+import AuditLog from "@/pages/AuditLog";
 import Dashboard from "@/pages/Dashboard";
 import Dependencies from "@/pages/Dependencies";
 import FindingDetails from "@/pages/FindingDetails";
 import Findings from "@/pages/Findings";
+import Integrations from "@/pages/Integrations";
 import NewScan from "@/pages/NewScan";
+import Notifications from "@/pages/Notifications";
+import Policies from "@/pages/Policies";
 import Posture from "@/pages/Posture";
+import PullRequestDetail from "@/pages/PullRequestDetail";
+import PullRequests from "@/pages/PullRequests";
 import Readiness from "@/pages/Readiness";
 import ReportView from "@/pages/ReportView";
 import RepositoryFiles from "@/pages/RepositoryFiles";
@@ -41,6 +47,12 @@ export default function App() {
           <Route path="chat" element={<ScanChat />} />
           <Route path="report" element={<ReportView />} />
         </Route>
+        <Route path="/integrations" element={<Integrations />} />
+        <Route path="/pull-requests" element={<PullRequests />} />
+        <Route path="/pull-requests/:prId" element={<PullRequestDetail />} />
+        <Route path="/policies" element={<Policies />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/audit" element={<AuditLog />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

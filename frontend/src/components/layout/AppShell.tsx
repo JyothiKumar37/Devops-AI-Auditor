@@ -23,6 +23,11 @@ const NAV: NavItem[] = [
   { to: "/", end: true, label: "Dashboard", hint: "Fleet overview", icon: <Icon path="M3 12l9-9 9 9M5 10v10h14V10" /> },
   { to: "/scan/new", label: "New Scan", hint: "Audit a repository", icon: <Icon path="M12 4v16m8-8H4" /> },
   { to: "/scans", label: "Scans", hint: "History & status", icon: <Icon path="M4 6h16M4 12h16M4 18h16" /> },
+  { to: "/integrations", label: "Integrations", hint: "GitHub & GitLab", icon: <Icon path="M13.5 6H18a3 3 0 013 3v0a3 3 0 01-3 3h-4.5M10.5 18H6a3 3 0 01-3-3v0a3 3 0 013-3h4.5M8 12h8" /> },
+  { to: "/pull-requests", label: "Pull Requests", hint: "PR scan gates", icon: <Icon path="M6 3v12m0 0a3 3 0 103 3m-3-3a3 3 0 013 3m9-9V9a3 3 0 00-3-3h-3m0 0l2.5-2.5M15 6l2.5 2.5" /> },
+  { to: "/policies", label: "Policies", hint: "Policy-as-code", icon: <Icon path="M9 12l2 2 4-4m5.6 1A9 9 0 1112 3a9 9 0 018.6 8z" /> },
+  { to: "/notifications", label: "Notifications", hint: "Alert channels", icon: <Icon path="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1" /> },
+  { to: "/audit", label: "Audit Log", hint: "Sensitive actions", icon: <Icon path="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /> },
   {
     to: "/settings",
     label: "Settings",
