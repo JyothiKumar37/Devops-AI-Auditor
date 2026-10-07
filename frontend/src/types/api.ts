@@ -891,3 +891,126 @@ export interface AuditLogListResponse {
   total: number;
   items: AuditLog[];
 }
+
+
+// ---- Phase 3: AI investigation ---------------------------------------------
+
+export interface InvestigationTraceStep {
+  kind: string; // plan | tool | observation | answer | note
+  label: string;
+  tool?: string;
+  status?: string;
+  returned?: number;
+  truncated?: boolean;
+}
+
+export interface InvestigationCitation {
+  type: string; // finding | file
+  finding_id?: string;
+  path?: string;
+}
+
+export interface InvestigationEvidence {
+  tool: string;
+  args: Record<string, unknown>;
+  returned: number;
+  truncated: boolean;
+  data: unknown;
+}
+
+export interface InvestigationResult {
+  investigation_id: string | null;
+  question: string;
+  answer: string;
+  root_cause: string;
+  impact: string;
+  recommendations: string[];
+  confidence: "high" | "medium" | "low";
+  cited_finding_ids: string[];
+  cited_files: string[];
+  citations: InvestigationCitation[];
+  evidence: InvestigationEvidence[];
+  trace: InvestigationTraceStep[];
+  label: string;
+  ai_used: boolean;
+  tool_calls: number;
+  hallucination_guard_triggered: boolean;
+}
+
+export interface InvestigationSummary {
+  id: string;
+  scope: string;
+  scan_id: string | null;
+  finding_id: string | null;
+  repository_name: string;
+  question: string;
+  confidence: string;
+  label: string;
+  ai_used: boolean;
+  tool_calls: number;
+  created_at: string;
+}
+
+export interface InvestigationListResponse {
+  total: number;
+  items: InvestigationSummary[];
+}
+
+export interface InvestigationDetail extends InvestigationSummary {
+  answer: string;
+  root_cause: string;
+  impact: string;
+  recommendations: string[];
+  citations: InvestigationCitation[];
+  evidence: InvestigationEvidence[];
+  trace: InvestigationTraceStep[];
+  hallucination_guard_triggered: boolean;
+}
+
+export interface RemediationStep {
+  order: number;
+  action: string;
+  finding_id: string;
+  rule_id: string;
+  file: string | null;
+  deterministic_recommendation: string;
+}
+
+export interface RemediationPlan {
+  scan_id: string;
+  problem: string;
+  root_cause: string;
+  steps: RemediationStep[];
+  affected_files: string[];
+  expected_findings_resolved: string[];
+  estimated_score_before: number;
+  estimated_score_after: number;
+  estimated_score_delta: number;
+  estimate_note: string;
+  risk_level: string;
+  requires_approval: boolean;
+  status: string;
+  label: string;
+  ai_used: boolean;
+  confidence: string;
+}
+
+export interface AIReviewItem {
+  title: string;
+  concern: string;
+  category: string;
+  confidence: string;
+  files: string[];
+  source: string;
+  authoritative: boolean;
+}
+
+export interface AIReviewResponse {
+  label: string;
+  authoritative: boolean;
+  ai_used: boolean;
+  note: string;
+  items: AIReviewItem[];
+  pr_scan_id?: string | null;
+  scan_id?: string | null;
+}

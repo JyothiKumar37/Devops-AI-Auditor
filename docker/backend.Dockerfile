@@ -4,7 +4,10 @@
 # Multi-stage build keeps the runtime lean and runs as a non-root user.
 # =============================================================================
 
-FROM python:3.11-slim AS base
+# Pinned by digest for reproducible, supply-chain-resistant builds. The tag is
+# kept for readability; the digest is authoritative. To update: re-resolve the
+# digest for python:3.11-slim and bump both here.
+FROM python:3.11-slim@sha256:0dd364ba7e10242f07755449e3a3d0e35f9efd987952737b90def6709ab0c5ce AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \

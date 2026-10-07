@@ -89,6 +89,8 @@ class PRFeedbackService:
     ) -> None:
         """Post/refresh the summary comment and set the commit status."""
         body = self._summary_markdown(pull_request, pr_scan)
+        if self._settings.ai_pr_review_enabled:
+            body += await self._ai_review_section(repo, pr_scan)
         try:
             await self._reconcile_comment(provider, repo, pull_request, body)
         except SCMError as exc:  # feedback is best-effort
@@ -145,6 +147,33 @@ class PRFeedbackService:
             await service.dispatch(NotificationEvent.PR_SCAN_FAILED.value, notification)
         except Exception as exc:  # noqa: BLE001 - notifications must never fail a scan
             logger.warning("pr_notification_failed", repo=repo.full_name, error=str(exc))
+
+    async def _ai_review_section(self, repo: SCMRepo, pr_scan: PullRequestScan) -> str:
+        """Best-effort, clearly-labeled AI review markdown (never affects the gate)."""
+        try:
+            from services.ai_pr_review_service import review_pr_scan_items
+
+            items = await review_pr_scan_items(
+                self._session, self._settings, pr_scan, repo.full_name
+            )
+        except Exception as exc:  # noqa: BLE001 - advisory; never break feedback
+            logger.warning("pr_ai_review_failed", repo=repo.full_name, error=str(exc))
+            return ""
+        if not items:
+            return ""
+        lines = [
+            "\n\n---",
+            "### AI Review (advisory - not a deterministic finding)",
+            "_These observations are AI-generated, non-authoritative, and do NOT "
+            "affect the status check or policy gate._\n",
+        ]
+        for item in items:
+            files = ", ".join(f"`{f}`" for f in item.files) or "(see PR)"
+            lines.append(
+                f"- **{item.title}** (confidence: {item.confidence}) — {item.concern} "
+                f"[{files}]"
+            )
+        return "\n".join(lines)
 
     async def _reconcile_comment(
         self,

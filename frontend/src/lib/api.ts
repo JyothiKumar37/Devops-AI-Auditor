@@ -3,9 +3,14 @@
 // the browser on a single origin and avoids CORS during development.
 
 import type {
+  AIReviewResponse,
   ApiErrorBody,
   AuditLogListResponse,
   AuditReport,
+  InvestigationDetail,
+  InvestigationListResponse,
+  InvestigationResult,
+  RemediationPlan,
   Integration,
   IntegrationConnectRequest,
   IntegrationListResponse,
@@ -363,6 +368,32 @@ export const api = {
   // ---- Phase 2: audit log ----
   listAuditLogs: (params: { action?: string; resource_type?: string } = {}) =>
     request<AuditLogListResponse>(`${API_V1}/audit-logs${query(params)}`),
+
+  // ---- Phase 3: AI investigation ----
+  investigateScan: (scanId: string, question: string) =>
+    postJson<InvestigationResult>(`${API_V1}/ai/scans/${scanId}/investigate`, { question }),
+  investigateFinding: (scanId: string, findingId: string, question: string) =>
+    postJson<InvestigationResult>(
+      `${API_V1}/ai/scans/${scanId}/findings/${findingId}/investigate`,
+      { question },
+    ),
+  investigateRepository: (repository: string, question: string) =>
+    postJson<InvestigationResult>(`${API_V1}/ai/repository/investigate`, {
+      repository,
+      question,
+    }),
+  listInvestigations: (params: { scan_id?: string; repository?: string } = {}) =>
+    request<InvestigationListResponse>(`${API_V1}/ai/investigations${query(params)}`),
+  getInvestigation: (id: string) =>
+    request<InvestigationDetail>(`${API_V1}/ai/investigations/${id}`),
+  remediationPlan: (
+    scanId: string,
+    payload: { finding_ids?: string[]; max_targets?: number } = {},
+  ) => postJson<RemediationPlan>(`${API_V1}/ai/scans/${scanId}/remediation-plan`, payload),
+  reviewPullRequest: (prId: string) =>
+    postJson<AIReviewResponse>(`${API_V1}/ai/pull-requests/${prId}/review`, {}),
+  securityReview: (scanId: string) =>
+    postJson<AIReviewResponse>(`${API_V1}/ai/scans/${scanId}/security-review`, {}),
 
   uploadScan,
 };

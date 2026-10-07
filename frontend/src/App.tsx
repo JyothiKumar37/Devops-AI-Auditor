@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
+import AIInvestigation from "@/pages/AIInvestigation";
 import AuditLog from "@/pages/AuditLog";
 import Dashboard from "@/pages/Dashboard";
 import Dependencies from "@/pages/Dependencies";
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="readiness" element={<Readiness />} />
           <Route path="diff" element={<ScanDiff />} />
           <Route path="chat" element={<ScanChat />} />
+          <Route path="investigate" element={<AIInvestigation />} />
           <Route path="report" element={<ReportView />} />
         </Route>
         <Route path="/integrations" element={<Integrations />} />

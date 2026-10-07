@@ -18,8 +18,12 @@ from agents.ai_assist import AiAssistService
 from core.config import Settings
 from core.database import Database
 from core.redis import RedisClient
+from services.ai_pr_review_service import AiPrReviewService
+from services.ai_security_review_service import AiSecurityReviewService
 from services.health_service import HealthService
 from services.integration_service import IntegrationService
+from services.investigation_service import InvestigationService
+from services.remediation_plan_service import RemediationPlanService
 from services.remediation_service import RemediationService
 from services.report import ReportService
 from services.scan_service import ScanService
@@ -109,3 +113,45 @@ def get_integration_service(
 
 
 IntegrationServiceDep = Annotated[IntegrationService, Depends(get_integration_service)]
+
+
+def get_investigation_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> InvestigationService:
+    return InvestigationService(session=session, settings=settings)
+
+
+InvestigationServiceDep = Annotated[
+    InvestigationService, Depends(get_investigation_service)
+]
+
+
+def get_remediation_plan_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> RemediationPlanService:
+    return RemediationPlanService(session=session, settings=settings)
+
+
+RemediationPlanServiceDep = Annotated[
+    RemediationPlanService, Depends(get_remediation_plan_service)
+]
+
+
+def get_ai_pr_review_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> AiPrReviewService:
+    return AiPrReviewService(session=session, settings=settings)
+
+
+AiPrReviewServiceDep = Annotated[AiPrReviewService, Depends(get_ai_pr_review_service)]
+
+
+def get_ai_security_review_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> AiSecurityReviewService:
+    return AiSecurityReviewService(session=session, settings=settings)
+
+
+AiSecurityReviewServiceDep = Annotated[
+    AiSecurityReviewService, Depends(get_ai_security_review_service)
+]

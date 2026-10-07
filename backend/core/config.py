@@ -162,6 +162,12 @@ class Settings(BaseSettings):
     ai_scan_max_files: int = 25
     # Per-file character cap sent to the model.
     ai_scan_max_file_bytes: int = 8000
+    # ---- Phase 3: agentic AI review (optional, non-authoritative) ----
+    # When true, PR feedback appends a best-effort AI review section (clearly
+    # labeled, never affecting the deterministic gate). Off by default.
+    ai_pr_review_enabled: bool = False
+    # Max AI review items returned per PR / security review.
+    ai_review_max_items: int = 8
 
     # Timeout (seconds) for any external scanner invocation.
     external_tool_timeout: int = 120

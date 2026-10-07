@@ -74,6 +74,9 @@ services:
       # LLM reasoning inside /report. Off by default so the report/Overview
       # render instantly and deterministically (AI value is on-demand elsewhere).
       AI_REPORT_ENABLED: ${AI_REPORT_ENABLED:-false}
+      # Phase 3: agentic AI investigation / reviews (optional, non-authoritative).
+      AI_PR_REVIEW_ENABLED: ${AI_PR_REVIEW_ENABLED:-false}
+      AI_REVIEW_MAX_ITEMS: ${AI_REVIEW_MAX_ITEMS:-8}
       # Phase 2: SCM integrations, PR scanning, webhooks, notifications.
       INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
@@ -126,6 +129,8 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL:-}
       AI_SCAN_ENABLED: ${AI_SCAN_ENABLED:-false}
       AI_REPORT_ENABLED: ${AI_REPORT_ENABLED:-false}
+      AI_PR_REVIEW_ENABLED: ${AI_PR_REVIEW_ENABLED:-false}
+      AI_REVIEW_MAX_ITEMS: ${AI_REVIEW_MAX_ITEMS:-8}
       # Phase 2: the worker runs PR scans, so it needs the encryption key (to
       # decrypt stored tokens), the SCM API URLs, and the notification config.
       INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}

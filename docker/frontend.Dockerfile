@@ -9,7 +9,10 @@
 # Node 20 (active LTS) matches the version the CI quality gate builds/tests with
 # (see .github/workflows/reusable-frontend.yml). Keeping them in lockstep avoids
 # "works in CI, breaks in the image" drift and an end-of-life base runtime.
-FROM node:20-alpine
+# Pinned by digest for reproducible, supply-chain-resistant builds. The tag is
+# kept for readability; the digest is authoritative. To update: re-resolve the
+# digest for node:20-alpine and bump it here.
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
 
 WORKDIR /app
 

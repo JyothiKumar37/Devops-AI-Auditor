@@ -939,3 +939,147 @@ class AuditLogRead(BaseModel):
 class AuditLogListResponse(BaseModel):
     total: int
     items: list[AuditLogRead] = []
+
+
+# ---- Phase 3: AI investigations --------------------------------------------
+
+
+class InvestigationRequest(BaseModel):
+    """A natural-language investigation question."""
+
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class RepositoryInvestigationRequest(BaseModel):
+    repository: str = Field(min_length=1)
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class InvestigationResponse(BaseModel):
+    """The engine's evidence-grounded result. ``label`` marks it as AI analysis,
+    never a deterministic finding; ``confidence`` is deterministic/evidence-based."""
+
+    investigation_id: str | None = None
+    question: str
+    answer: str
+    root_cause: str = ""
+    impact: str = ""
+    recommendations: list[str] = []
+    confidence: str = "low"
+    cited_finding_ids: list[str] = []
+    cited_files: list[str] = []
+    citations: list[dict] = []
+    evidence: list[dict] = []
+    trace: list[dict] = []
+    label: str = "AI Insight"
+    ai_used: bool = False
+    tool_calls: int = 0
+    hallucination_guard_triggered: bool = False
+
+
+class InvestigationSummary(BaseModel):
+    """A row in the investigation history list."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    scope: str
+    scan_id: uuid.UUID | None = None
+    finding_id: uuid.UUID | None = None
+    repository_name: str = ""
+    question: str
+    confidence: str = "low"
+    label: str = "AI Insight"
+    ai_used: bool = False
+    tool_calls: int = 0
+    created_at: datetime
+
+
+class InvestigationListResponse(BaseModel):
+    total: int
+    items: list[InvestigationSummary] = []
+
+
+class InvestigationDetail(BaseModel):
+    """A reopened investigation session with its full evidence + trace."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    scope: str
+    scan_id: uuid.UUID | None = None
+    finding_id: uuid.UUID | None = None
+    repository_name: str = ""
+    question: str
+    answer: str = ""
+    root_cause: str = ""
+    impact: str = ""
+    confidence: str = "low"
+    label: str = "AI Insight"
+    recommendations: list = []
+    citations: list = []
+    evidence: list = []
+    trace: list = []
+    ai_used: bool = False
+    tool_calls: int = 0
+    hallucination_guard_triggered: bool = False
+    created_at: datetime
+
+
+class RemediationPlanRequest(BaseModel):
+    """Request a remediation plan. Omit finding_ids to auto-select by risk."""
+
+    finding_ids: list[uuid.UUID] | None = None
+    max_targets: int = Field(default=5, ge=1, le=8)
+
+
+class RemediationStepResponse(BaseModel):
+    order: int
+    action: str
+    finding_id: str
+    rule_id: str
+    file: str | None = None
+    deterministic_recommendation: str = ""
+
+
+class RemediationPlanResponse(BaseModel):
+    """A proposed remediation plan. Always requires approval; never auto-applied."""
+
+    scan_id: str
+    problem: str
+    root_cause: str = ""
+    steps: list[RemediationStepResponse] = []
+    affected_files: list[str] = []
+    expected_findings_resolved: list[str] = []
+    estimated_score_before: int = 0
+    estimated_score_after: int = 0
+    estimated_score_delta: int = 0
+    estimate_note: str = ""
+    risk_level: str = "low"
+    requires_approval: bool = True
+    status: str = "proposed"
+    label: str = "AI Remediation Plan"
+    ai_used: bool = False
+    confidence: str = "low"
+
+
+class AIReviewItemResponse(BaseModel):
+    title: str
+    concern: str
+    category: str = "security"
+    confidence: str = "low"
+    files: list[str] = []
+    source: str = "AI_REVIEW"
+    authoritative: bool = False
+
+
+class AIReviewResponse(BaseModel):
+    """Non-authoritative AI review output (PR or security). Never fails a gate."""
+
+    label: str = "AI Review"
+    authoritative: bool = False
+    ai_used: bool = False
+    note: str = ""
+    items: list[AIReviewItemResponse] = []
+    pr_scan_id: str | None = None
+    scan_id: str | None = None

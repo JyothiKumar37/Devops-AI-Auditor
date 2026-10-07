@@ -1,5 +1,6 @@
 """Persistence models and shared API schemas."""
 
+from models.ai_investigation import AIInvestigation
 from models.app_setting import AppSetting
 from models.audit import AuditLog
 from models.base import Base
@@ -28,6 +29,7 @@ from models.scan import RepositoryFile, Scan
 from models.suppression import Suppression
 
 __all__ = [
+    "AIInvestigation",
     "AppSetting",
     "AuditLog",
     "Base",
