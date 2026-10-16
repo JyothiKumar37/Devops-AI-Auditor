@@ -29,6 +29,15 @@ celery_app.conf.update(
 )
 
 # Ensure task modules are imported so tasks register on worker startup.
+# ``autodiscover_tasks`` only loads the default ``workers.tasks`` module, so the
+# additional task modules (cloud sync, security ingestion/polling) are listed
+# explicitly via ``include`` - otherwise Celery beat emits tasks the worker never
+# registered (e.g. ``workers.poll_security_sources``).
+celery_app.conf.imports = (
+    "workers.tasks",
+    "workers.cloud_tasks",
+    "workers.security_tasks",
+)
 celery_app.autodiscover_tasks(["workers"])
 
 # Phase 4: periodic cloud synchronization (Celery beat). Disabled when the
