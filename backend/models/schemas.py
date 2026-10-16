@@ -1083,3 +1083,452 @@ class AIReviewResponse(BaseModel):
     items: list[AIReviewItemResponse] = []
     pr_scan_id: str | None = None
     scan_id: str | None = None
+
+
+# ---- Phase 4: cloud accounts -----------------------------------------------
+
+
+class CloudAccountConnectRequest(BaseModel):
+    """Connect an AWS account via a read-only IAM role (STS AssumeRole).
+
+    The external id (confused-deputy protection) is optional but recommended; it
+    is stored encrypted. The account id is derived from AWS, not from this request.
+    """
+
+    name: str = ""
+    role_arn: str = Field(min_length=1)
+    external_id: str | None = None
+    regions: list[str] = Field(default_factory=list)
+
+
+class CloudAccountRead(BaseModel):
+    """A connected cloud account. Secrets (external id) are NEVER returned."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    provider: str
+    name: str
+    account_id: str
+    role_arn: str
+    regions: list[str] = []
+    status: str
+    status_detail: str = ""
+    last_synced_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CloudAccountListResponse(BaseModel):
+    total: int
+    items: list[CloudAccountRead] = []
+
+
+class CloudAssetRead(BaseModel):
+    """A discovered AWS resource (metadata only; no secret values)."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    service: str
+    resource_type: str
+    resource_id: str
+    arn: str = ""
+    name: str = ""
+    region: str = ""
+    state: str = ""
+    exposure: str = "unknown"
+    tags: dict = {}
+    attributes: dict = {}
+    first_discovered_at: datetime
+    last_synced_at: datetime
+
+
+class CloudAssetListResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[CloudAssetRead] = []
+
+
+class CloudSnapshotRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    status: str
+    regions: list[str] = []
+    asset_count: int = 0
+    finding_count: int = 0
+    error: str | None = None
+    created_at: datetime
+    completed_at: datetime | None = None
+
+
+class CloudFindingRead(BaseModel):
+    """A deterministic cloud security finding."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    service: str
+    resource_id: str = ""
+    region: str = ""
+    rule_id: str
+    scanner: str = ""
+    category: str
+    severity: str
+    confidence: str = "high"
+    title: str
+    description: str = ""
+    evidence: str | None = None
+    recommendation: str = ""
+    compliance: list[str] = []
+    created_at: datetime
+
+
+class CloudFindingListResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[CloudFindingRead] = []
+
+
+class CloudDriftCorrelateRequest(BaseModel):
+    """Correlate the Terraform in a scan against a cloud account's live state."""
+
+    scan_id: uuid.UUID
+
+
+class CloudDriftRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    resource_id: str = ""
+    service: str = ""
+    terraform_address: str | None = None
+    status: str
+    expected: dict = {}
+    actual: dict = {}
+    differences: list = []
+    created_at: datetime
+
+
+class CloudDriftListResponse(BaseModel):
+    total: int
+    items: list[CloudDriftRead] = []
+    summary: dict = {}
+
+
+class ComplianceExceptionCreateRequest(BaseModel):
+    """Create a compliance exception (optionally time-limited)."""
+
+    framework: str = Field(min_length=1)
+    control_id: str = Field(min_length=1)
+    # accept_risk | false_positive | not_applicable | compensating_control
+    reason: str = Field(min_length=1)
+    owner: str = Field(min_length=1)
+    note: str = ""
+    resource_id: str | None = None
+    approved_by: str = ""
+    expires_at: datetime | None = None
+
+
+class ComplianceExceptionRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    framework: str
+    control_id: str
+    resource_id: str | None = None
+    reason: str
+    owner: str = ""
+    note: str = ""
+    approved_by: str = ""
+    expires_at: datetime | None = None
+    created_at: datetime
+
+
+class ComplianceExceptionListResponse(BaseModel):
+    total: int
+    items: list[ComplianceExceptionRead] = []
+
+
+class CloudChangeRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    account_id: uuid.UUID
+    service: str = ""
+    resource_id: str = ""
+    change_type: str
+    detail: dict = {}
+    risk_significant: bool = False
+    created_at: datetime
+
+
+class CloudChangeListResponse(BaseModel):
+    total: int
+    items: list[CloudChangeRead] = []
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: continuous security operations & incident response
+# ---------------------------------------------------------------------------
+
+
+class SecurityEventRead(BaseModel):
+    """A normalized security event (secret-redacted)."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    source_type: str
+    source_event_id: str
+    cloud_account_id: uuid.UUID | None = None
+    account_ref: str
+    region: str
+    resource_id: str
+    resource_arn: str
+    principal: str
+    source_ip: str
+    category: str
+    event_type: str
+    severity: str
+    confidence: str
+    title: str
+    description: str
+    verified: bool
+    related_finding_ids: list[str] = []
+    evidence: dict = {}
+    occurrences: int
+    status: str
+    incident_id: uuid.UUID | None = None
+    first_observed_at: datetime
+    last_observed_at: datetime
+    created_at: datetime
+
+
+class SecurityEventListResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[SecurityEventRead] = []
+
+
+class SecuritySourceRead(BaseModel):
+    """A registered security event source + its sync health (no secrets)."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    source_type: str
+    name: str
+    enabled: bool
+    cloud_account_id: uuid.UUID | None = None
+    last_polled_at: datetime | None = None
+    last_event_at: datetime | None = None
+    last_status: str
+    last_error: str
+    events_ingested: int
+
+
+class SecuritySourceListResponse(BaseModel):
+    total: int
+    items: list[SecuritySourceRead] = []
+
+
+class IncidentResourceRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    resource_id: str
+    resource_arn: str
+    service: str
+    region: str
+    exposure: str
+    role: str
+
+
+class IncidentTimelineEntryRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    entry_type: str
+    title: str
+    detail: dict = {}
+    evidence_class: str
+    actor: str
+    occurred_at: datetime
+
+
+class IncidentNoteRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    author: str
+    body: str
+    created_at: datetime
+
+
+class IncidentRead(BaseModel):
+    """Incident summary row."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    title: str
+    description: str
+    severity: str
+    priority: int
+    risk_score: float
+    status: str
+    cloud_account_id: uuid.UUID | None = None
+    account_ref: str
+    owner: str
+    root_cause_hypothesis: str
+    resolution_summary: str
+    event_count: int
+    first_event_at: datetime | None = None
+    last_event_at: datetime | None = None
+    acknowledged_at: datetime | None = None
+    resolved_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class IncidentListResponse(BaseModel):
+    total: int
+    returned: int
+    items: list[IncidentRead] = []
+
+
+class IncidentEventRead(SecurityEventRead):
+    """An incident member event, with its correlation rationale."""
+
+    rationale: str = ""
+    correlation_signal: str = ""
+
+
+class IncidentDetail(IncidentRead):
+    """Full incident view: events (with rationale), resources, timeline, notes."""
+
+    risk_rationale: dict = {}
+    events: list[IncidentEventRead] = []
+    resources: list[IncidentResourceRead] = []
+    timeline: list[IncidentTimelineEntryRead] = []
+    notes: list[IncidentNoteRead] = []
+
+
+class IncidentCreateRequest(BaseModel):
+    event_ids: list[uuid.UUID] = Field(min_length=1)
+    title: str = ""
+    description: str = ""
+
+
+class IncidentUpdateRequest(BaseModel):
+    owner: str | None = None
+    root_cause_hypothesis: str | None = None
+    resolution_summary: str | None = None
+
+
+class IncidentTransitionRequest(BaseModel):
+    status: str
+    actor: str = ""
+    note: str = ""
+
+
+class IncidentNoteCreateRequest(BaseModel):
+    body: str = Field(min_length=1)
+    author: str = ""
+
+
+class CorrelateResponse(BaseModel):
+    incidents_touched: int
+    incident_ids: list[uuid.UUID] = []
+
+
+class ContainmentApprovalRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    decision: str
+    approver: str
+    reason: str
+    created_at: datetime
+
+
+class ContainmentExecutionRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    status: str
+    executed_by: str
+    output: str
+    before_state: dict = {}
+    after_state: dict = {}
+    verification: dict = {}
+    created_at: datetime
+
+
+class ContainmentPlanRead(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    title: str
+    root_cause: str
+    proposed_action: str
+    capability: str
+    affected_resources: list = []
+    expected_benefit: str
+    potential_impact: str
+    prerequisites: list = []
+    rollback_plan: str
+    verification_steps: list = []
+    required_permissions: list = []
+    related_finding_ids: list = []
+    status: str
+    ai_generated: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ContainmentPlanDetail(ContainmentPlanRead):
+    approvals: list[ContainmentApprovalRead] = []
+    executions: list[ContainmentExecutionRead] = []
+
+
+class ContainmentPlanListResponse(BaseModel):
+    total: int
+    items: list[ContainmentPlanRead] = []
+
+
+class ContainmentDecisionRequest(BaseModel):
+    approver: str = Field(min_length=1)
+    reason: str = ""
+
+
+class ContainmentExecuteRequest(BaseModel):
+    actor: str = ""
+
+
+class IncidentInvestigationRead(BaseModel):
+    """A persisted AI investigation run against an incident (read-only, grounded)."""
+
+    model_config = {"from_attributes": True}
+
+    id: uuid.UUID
+    incident_id: uuid.UUID
+    question: str
+    answer: str
+    root_cause: str
+    impact: str
+    confidence: str
+    recommendations: list = []
+    citations: list = []
+    uncertainties: list = []
+    ai_used: bool
+    tool_calls: int
+    hallucination_guard_triggered: bool
+    created_at: datetime

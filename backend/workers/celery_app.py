@@ -30,3 +30,20 @@ celery_app.conf.update(
 
 # Ensure task modules are imported so tasks register on worker startup.
 celery_app.autodiscover_tasks(["workers"])
+
+# Phase 4: periodic cloud synchronization (Celery beat). Disabled when the
+# interval is 0. Requires a `celery beat` process in addition to the worker.
+_beat_schedule: dict = {}
+if settings.aws_sync_interval_hours > 0:
+    _beat_schedule["sync-all-cloud-accounts"] = {
+        "task": "workers.sync_all_cloud_accounts",
+        "schedule": float(settings.aws_sync_interval_hours * 3600),
+    }
+# Phase 5: periodic security-source polling + correlation + event pruning.
+if settings.security_poll_interval_minutes > 0:
+    _beat_schedule["poll-security-sources"] = {
+        "task": "workers.poll_security_sources",
+        "schedule": float(settings.security_poll_interval_minutes * 60),
+    }
+if _beat_schedule:
+    celery_app.conf.beat_schedule = _beat_schedule

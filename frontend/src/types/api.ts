@@ -1014,3 +1014,500 @@ export interface AIReviewResponse {
   pr_scan_id?: string | null;
   scan_id?: string | null;
 }
+
+
+// ---- Phase 4: Cloud runtime intelligence, IaC drift & compliance ----------
+
+export type CloudAccountStatus = "connected" | "error" | "pending";
+
+export interface CloudAccount {
+  id: string;
+  provider: string;
+  name: string;
+  account_id: string;
+  role_arn: string;
+  regions: string[];
+  status: string;
+  status_detail: string;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CloudAccountListResponse {
+  total: number;
+  items: CloudAccount[];
+}
+
+export interface CloudAccountConnectRequest {
+  name?: string;
+  role_arn: string;
+  external_id?: string | null;
+  regions?: string[];
+}
+
+export interface CloudAsset {
+  id: string;
+  account_id: string;
+  service: string;
+  resource_type: string;
+  resource_id: string;
+  arn: string;
+  name: string;
+  region: string;
+  state: string;
+  exposure: string;
+  tags: Record<string, string>;
+  attributes: Record<string, unknown>;
+  first_discovered_at: string;
+  last_synced_at: string;
+}
+
+export interface CloudAssetListResponse {
+  total: number;
+  returned: number;
+  items: CloudAsset[];
+}
+
+export interface CloudSnapshot {
+  id: string;
+  account_id: string;
+  status: string;
+  regions: string[];
+  asset_count: number;
+  finding_count: number;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface CloudFinding {
+  id: string;
+  account_id: string;
+  service: string;
+  resource_id: string;
+  region: string;
+  rule_id: string;
+  scanner: string;
+  category: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  description: string;
+  evidence: string | null;
+  recommendation: string;
+  compliance: string[];
+  created_at: string;
+}
+
+export interface CloudFindingListResponse {
+  total: number;
+  returned: number;
+  items: CloudFinding[];
+}
+
+export interface CloudPostureDomain {
+  key: string;
+  label: string;
+  score: number;
+  applicable: boolean;
+  findings: number;
+  counts: Record<string, number>;
+  explanation: string;
+}
+
+export interface CloudPostureResponse {
+  account_id: string;
+  overall: number;
+  total_findings: number;
+  severity_counts: Record<string, number>;
+  by_service: Record<string, number>;
+  domains: CloudPostureDomain[];
+  top_risk_areas: Array<{ key: string; label: string; score: number }>;
+}
+
+export interface CloudNetworkNode {
+  id: string;
+  type: string;
+  service: string;
+  label: string;
+  region?: string;
+  exposure?: string;
+  max_severity?: string | null;
+}
+
+export interface CloudNetworkEdge {
+  source: string;
+  target: string;
+  relation: string;
+  detail: Record<string, unknown>;
+}
+
+export interface CloudNetworkResponse {
+  account_id: string;
+  nodes: CloudNetworkNode[];
+  edges: CloudNetworkEdge[];
+}
+
+export interface CloudAttackSurfaceResource {
+  resource_id: string;
+  service: string;
+  region: string;
+  name: string;
+  severity: string;
+}
+
+export interface CloudAttackSurfaceResponse {
+  account_id: string;
+  internet_facing: number;
+  by_severity: Record<string, number>;
+  by_service: Record<string, number>;
+  resources: CloudAttackSurfaceResource[];
+}
+
+export interface CloudDrift {
+  id: string;
+  account_id: string;
+  resource_id: string;
+  service: string;
+  terraform_address: string | null;
+  status: string;
+  expected: Record<string, unknown>;
+  actual: Record<string, unknown>;
+  differences: Array<Record<string, unknown>>;
+  created_at: string;
+}
+
+export interface CloudDriftListResponse {
+  total: number;
+  items: CloudDrift[];
+  summary: Record<string, number>;
+}
+
+export interface ComplianceFramework {
+  framework: string;
+  label: string;
+  controls: string;
+}
+
+export interface ComplianceControlResult {
+  control_id: string;
+  title: string;
+  description: string;
+  status: "PASS" | "FAIL" | "NOT_APPLICABLE" | "NOT_ASSESSED";
+  evidence: string;
+  affected_resources: Array<{ resource_id: string; severity: string; service: string }>;
+  finding_ids: string[];
+  remediation: string;
+}
+
+export interface ComplianceAssessment {
+  account_id: string;
+  framework: string;
+  label: string;
+  generated_at: string;
+  disclaimer: string;
+  summary: Record<string, number>;
+  pass_rate: number;
+  controls: ComplianceControlResult[];
+}
+
+export interface ComplianceException {
+  id: string;
+  account_id: string;
+  framework: string;
+  control_id: string;
+  resource_id: string | null;
+  reason: string;
+  owner: string;
+  note: string;
+  approved_by: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface ComplianceExceptionListResponse {
+  total: number;
+  items: ComplianceException[];
+}
+
+export interface ComplianceExceptionCreateRequest {
+  framework: string;
+  control_id: string;
+  reason: string;
+  owner: string;
+  note?: string;
+  resource_id?: string | null;
+  approved_by?: string;
+  expires_at?: string | null;
+}
+
+export interface CloudChange {
+  id: string;
+  account_id: string;
+  service: string;
+  resource_id: string;
+  change_type: string;
+  detail: Record<string, unknown>;
+  risk_significant: boolean;
+  created_at: string;
+}
+
+export interface CloudChangeListResponse {
+  total: number;
+  items: CloudChange[];
+}
+
+export interface CloudEksCorrelation {
+  cluster: string;
+  region: string;
+  terraform_managed: boolean;
+  endpoint_public_access: boolean;
+  kubernetes: {
+    has_scan_evidence: boolean;
+    workloads: number;
+    services: Array<{ name: string; namespace: string }>;
+  };
+  path: Array<Record<string, unknown>>;
+}
+
+export interface CloudEksResponse {
+  account_id: string;
+  scan_id: string | null;
+  clusters: number;
+  correlations: CloudEksCorrelation[];
+}
+
+
+// ---- Phase 5: Continuous security operations & incident response ----------
+
+export interface SecurityEvent {
+  id: string;
+  source_type: string;
+  source_event_id: string;
+  cloud_account_id: string | null;
+  account_ref: string;
+  region: string;
+  resource_id: string;
+  resource_arn: string;
+  principal: string;
+  source_ip: string;
+  category: string;
+  event_type: string;
+  severity: string;
+  confidence: string;
+  title: string;
+  description: string;
+  verified: boolean;
+  related_finding_ids: string[];
+  evidence: Record<string, unknown>;
+  occurrences: number;
+  status: string;
+  incident_id: string | null;
+  first_observed_at: string;
+  last_observed_at: string;
+  created_at: string;
+}
+
+export interface SecurityEventListResponse {
+  total: number;
+  returned: number;
+  items: SecurityEvent[];
+}
+
+export interface SecuritySource {
+  id: string;
+  source_type: string;
+  name: string;
+  enabled: boolean;
+  cloud_account_id: string | null;
+  last_polled_at: string | null;
+  last_event_at: string | null;
+  last_status: string;
+  last_error: string;
+  events_ingested: number;
+}
+
+export interface SecurityIntegrationHealth {
+  total_sources: number;
+  sources: Array<{
+    source_type: string;
+    enabled: boolean;
+    status: string;
+    events_ingested: number;
+    last_event_at: string | null;
+    last_error: string;
+  }>;
+}
+
+export interface IncidentResource {
+  resource_id: string;
+  resource_arn: string;
+  service: string;
+  region: string;
+  exposure: string;
+  role: string;
+}
+
+export interface IncidentTimelineEntry {
+  id: string;
+  entry_type: string;
+  title: string;
+  detail: Record<string, unknown>;
+  evidence_class: string; // confirmed | reported | inferred | hypothesis | action
+  actor: string;
+  occurred_at: string;
+}
+
+export interface IncidentNote {
+  id: string;
+  author: string;
+  body: string;
+  created_at: string;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  description: string;
+  severity: string;
+  priority: number;
+  risk_score: number;
+  status: string;
+  cloud_account_id: string | null;
+  account_ref: string;
+  owner: string;
+  root_cause_hypothesis: string;
+  resolution_summary: string;
+  event_count: number;
+  first_event_at: string | null;
+  last_event_at: string | null;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncidentListResponse {
+  total: number;
+  returned: number;
+  items: Incident[];
+}
+
+export interface IncidentEvent extends SecurityEvent {
+  rationale: string;
+  correlation_signal: string;
+}
+
+export interface IncidentDetail extends Incident {
+  risk_rationale: {
+    factors?: Array<{ factor: string; points: number; max: number; detail: string }>;
+    distinct_issues?: number;
+    total_signals?: number;
+    method?: string;
+  };
+  events: IncidentEvent[];
+  resources: IncidentResource[];
+  timeline: IncidentTimelineEntry[];
+  notes: IncidentNote[];
+}
+
+export interface IncidentGraphNode {
+  id: string;
+  type: string;
+  label: string;
+  [key: string]: unknown;
+}
+
+export interface IncidentGraphEdge {
+  source: string;
+  target: string;
+  relation: string;
+  evidence_class: string;
+  detail: Record<string, unknown>;
+}
+
+export interface IncidentRelationships {
+  incident_id: string;
+  nodes: IncidentGraphNode[];
+  edges: IncidentGraphEdge[];
+  legend: Record<string, string>;
+}
+
+export interface ContainmentApproval {
+  id: string;
+  decision: string;
+  approver: string;
+  reason: string;
+  created_at: string;
+}
+
+export interface ContainmentExecution {
+  id: string;
+  status: string;
+  executed_by: string;
+  output: string;
+  before_state: Record<string, unknown>;
+  after_state: Record<string, unknown>;
+  verification: {
+    status?: string;
+    baseline_rules_total?: number;
+    still_failing?: Record<string, string[]>;
+    resources_checked?: number;
+    method?: string;
+  };
+  created_at: string;
+}
+
+export interface ContainmentPlan {
+  id: string;
+  incident_id: string;
+  title: string;
+  root_cause: string;
+  proposed_action: string;
+  capability: string; // read | plan | write
+  affected_resources: Array<Record<string, unknown>>;
+  expected_benefit: string;
+  potential_impact: string;
+  prerequisites: string[];
+  rollback_plan: string;
+  verification_steps: string[];
+  required_permissions: string[];
+  related_finding_ids: string[];
+  status: string;
+  ai_generated: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContainmentPlanDetail extends ContainmentPlan {
+  approvals: ContainmentApproval[];
+  executions: ContainmentExecution[];
+}
+
+export interface ContainmentPlanListResponse {
+  total: number;
+  items: ContainmentPlan[];
+}
+
+export interface IncidentInvestigationSummary {
+  id: string;
+  incident_id: string;
+  question: string;
+  answer: string;
+  root_cause: string;
+  impact: string;
+  confidence: string;
+  recommendations: string[];
+  citations: Array<Record<string, unknown>>;
+  uncertainties: string[];
+  ai_used: boolean;
+  tool_calls: number;
+  hallucination_guard_triggered: boolean;
+  created_at: string;
+}
+
+export interface CorrelateResponse {
+  incidents_touched: number;
+  incident_ids: string[];
+}

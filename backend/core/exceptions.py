@@ -62,6 +62,20 @@ class ServiceUnavailableError(AppError):
     code = "service_unavailable"
 
 
+class CloudConnectionError(AppError):
+    """An AWS connection/assume-role/API error (upstream, not our fault)."""
+
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "cloud_connection_error"
+
+
+class ConflictError(AppError):
+    """A request conflicts with the current resource state (e.g. bad transition)."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "conflict"
+
+
 def _error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "details": details or {}}}
 

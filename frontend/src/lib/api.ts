@@ -7,6 +7,36 @@ import type {
   ApiErrorBody,
   AuditLogListResponse,
   AuditReport,
+  CloudAccount,
+  CloudAccountConnectRequest,
+  CloudAccountListResponse,
+  CloudAsset,
+  CloudAssetListResponse,
+  CloudAttackSurfaceResponse,
+  CloudChangeListResponse,
+  CloudDriftListResponse,
+  CloudFindingListResponse,
+  CloudNetworkResponse,
+  CloudPostureResponse,
+  CloudSnapshot,
+  CloudEksResponse,
+  ComplianceAssessment,
+  ComplianceException,
+  ComplianceExceptionCreateRequest,
+  ComplianceExceptionListResponse,
+  ComplianceFramework,
+  ContainmentExecution,
+  ContainmentPlan,
+  ContainmentPlanDetail,
+  ContainmentPlanListResponse,
+  CorrelateResponse,
+  Incident,
+  IncidentDetail,
+  IncidentInvestigationSummary,
+  IncidentListResponse,
+  IncidentNote,
+  IncidentRelationships,
+  IncidentTimelineEntry,
   InvestigationDetail,
   InvestigationListResponse,
   InvestigationResult,
@@ -28,6 +58,8 @@ import type {
   PolicyVersion,
   PullRequestDetail,
   PullRequestListResponse,
+  SecurityEventListResponse,
+  SecurityIntegrationHealth,
   RemoteRepositoryListResponse,
   SCMRepository,
   SCMRepositoryListResponse,
@@ -109,7 +141,11 @@ async function post<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function sendJson<T>(method: "POST" | "PUT", path: string, payload: unknown): Promise<T> {
+async function sendJson<T>(
+  method: "POST" | "PUT" | "PATCH",
+  path: string,
+  payload: unknown,
+): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -132,6 +168,10 @@ function postJson<T>(path: string, payload: unknown): Promise<T> {
 
 function putJson<T>(path: string, payload: unknown): Promise<T> {
   return sendJson<T>("PUT", path, payload);
+}
+
+function patchJson<T>(path: string, payload: unknown): Promise<T> {
+  return sendJson<T>("PATCH", path, payload);
 }
 
 async function del(path: string): Promise<void> {
@@ -394,6 +434,147 @@ export const api = {
     postJson<AIReviewResponse>(`${API_V1}/ai/pull-requests/${prId}/review`, {}),
   securityReview: (scanId: string) =>
     postJson<AIReviewResponse>(`${API_V1}/ai/scans/${scanId}/security-review`, {}),
+
+  // ---- Phase 5: security events + incidents ----
+  listSecurityEvents: (
+    filters: { source_type?: string; severity?: string; event_status?: string; verified?: string } = {},
+  ) =>
+    request<SecurityEventListResponse>(
+      `${API_V1}/security/events${query({ ...filters, limit: "200" })}`,
+    ),
+  getSecurityIntegrationHealth: () =>
+    request<SecurityIntegrationHealth>(`${API_V1}/security/integrations/health`),
+  correlateSecurity: () => postJson<CorrelateResponse>(`${API_V1}/security/correlate`, {}),
+
+  listIncidents: (
+    filters: { incident_status?: string; severity?: string; unassigned?: string } = {},
+  ) =>
+    request<IncidentListResponse>(`${API_V1}/incidents${query({ ...filters, limit: "200" })}`),
+  getIncident: (id: string) => request<IncidentDetail>(`${API_V1}/incidents/${id}`),
+  updateIncident: (
+    id: string,
+    payload: { owner?: string; root_cause_hypothesis?: string; resolution_summary?: string },
+  ) => patchJson<Incident>(`${API_V1}/incidents/${id}`, payload),
+  transitionIncident: (id: string, status: string, actor = "", note = "") =>
+    postJson<Incident>(`${API_V1}/incidents/${id}/transition`, { status, actor, note }),
+  getIncidentTimeline: (id: string) =>
+    request<IncidentTimelineEntry[]>(`${API_V1}/incidents/${id}/timeline`),
+  getIncidentRelationships: (id: string) =>
+    request<IncidentRelationships>(`${API_V1}/incidents/${id}/relationships`),
+  addIncidentNote: (id: string, body: string, author = "") =>
+    postJson<IncidentNote>(`${API_V1}/incidents/${id}/notes`, { body, author }),
+
+  listRemediationPlans: (incidentId: string) =>
+    request<ContainmentPlanListResponse>(`${API_V1}/incidents/${incidentId}/remediation-plans`),
+  generateRemediationPlans: (incidentId: string) =>
+    postJson<ContainmentPlanListResponse>(
+      `${API_V1}/incidents/${incidentId}/remediation-plans`,
+      {},
+    ),
+  getRemediationPlan: (planId: string) =>
+    request<ContainmentPlanDetail>(`${API_V1}/remediation-plans/${planId}`),
+  approveRemediationPlan: (planId: string, approver: string, reason = "") =>
+    postJson<ContainmentPlan>(`${API_V1}/remediation-plans/${planId}/approve`, {
+      approver,
+      reason,
+    }),
+  rejectRemediationPlan: (planId: string, approver: string, reason = "") =>
+    postJson<ContainmentPlan>(`${API_V1}/remediation-plans/${planId}/reject`, {
+      approver,
+      reason,
+    }),
+  executeRemediationPlan: (planId: string, actor = "") =>
+    postJson<ContainmentExecution>(`${API_V1}/remediation-plans/${planId}/execute`, { actor }),
+  verifyRemediationPlan: (planId: string) =>
+    postJson<ContainmentExecution>(`${API_V1}/remediation-plans/${planId}/verify`, {}),
+
+  listIncidentInvestigations: (id: string) =>
+    request<IncidentInvestigationSummary[]>(`${API_V1}/incidents/${id}/investigations`),
+  investigateIncident: (id: string, question: string) =>
+    postJson<InvestigationResult>(`${API_V1}/incidents/${id}/investigations`, { question }),
+
+  // ---- Phase 4: cloud accounts ----
+  listCloudAccounts: () => request<CloudAccountListResponse>(`${API_V1}/cloud/accounts`),
+  getCloudAccount: (id: string) => request<CloudAccount>(`${API_V1}/cloud/accounts/${id}`),
+  connectCloudAccount: (payload: CloudAccountConnectRequest) =>
+    postJson<CloudAccount>(`${API_V1}/cloud/accounts`, payload),
+  validateCloudAccount: (id: string) =>
+    postJson<CloudAccount>(`${API_V1}/cloud/accounts/${id}/validate`, {}),
+  deleteCloudAccount: (id: string) => del(`${API_V1}/cloud/accounts/${id}`),
+  syncCloudAccount: (id: string) =>
+    postJson<CloudSnapshot>(`${API_V1}/cloud/accounts/${id}/sync`, {}),
+
+  // ---- Phase 4: assets ----
+  listCloudAssets: (
+    id: string,
+    filters: { svc?: string; region?: string; exposure?: string } = {},
+  ) =>
+    request<CloudAssetListResponse>(
+      `${API_V1}/cloud/accounts/${id}/assets${query({ ...filters, limit: "500" })}`,
+    ),
+  getCloudAsset: (assetId: string) =>
+    request<CloudAsset>(`${API_V1}/cloud/assets/${assetId}`),
+
+  // ---- Phase 4: findings + posture ----
+  listCloudFindings: (
+    id: string,
+    filters: { svc?: string; severity?: string } = {},
+  ) =>
+    request<CloudFindingListResponse>(
+      `${API_V1}/cloud/accounts/${id}/findings${query({ ...filters, limit: "500" })}`,
+    ),
+  getCloudPosture: (id: string) =>
+    request<CloudPostureResponse>(`${API_V1}/cloud/accounts/${id}/posture`),
+
+  // ---- Phase 4: network ----
+  getCloudNetwork: (id: string) =>
+    request<CloudNetworkResponse>(`${API_V1}/cloud/accounts/${id}/network`),
+  getCloudAttackSurface: (id: string) =>
+    request<CloudAttackSurfaceResponse>(`${API_V1}/cloud/accounts/${id}/attack-surface`),
+
+  // ---- Phase 4: drift ----
+  listCloudDrift: (id: string, status?: string) =>
+    request<CloudDriftListResponse>(
+      `${API_V1}/cloud/accounts/${id}/drift${query({ status_filter: status })}`,
+    ),
+  correlateCloudDrift: (id: string, scanId: string) =>
+    postJson<CloudDriftListResponse>(`${API_V1}/cloud/accounts/${id}/drift`, {
+      scan_id: scanId,
+    }),
+
+  // ---- Phase 4: compliance ----
+  listComplianceFrameworks: () =>
+    request<{ frameworks: ComplianceFramework[] }>(`${API_V1}/cloud/compliance/frameworks`),
+  assessCompliance: (id: string, framework: string) =>
+    request<ComplianceAssessment>(`${API_V1}/cloud/accounts/${id}/compliance/${framework}`),
+  listComplianceExceptions: (id: string) =>
+    request<ComplianceExceptionListResponse>(
+      `${API_V1}/cloud/accounts/${id}/compliance/exceptions`,
+    ),
+  createComplianceException: (id: string, payload: ComplianceExceptionCreateRequest) =>
+    postJson<ComplianceException>(
+      `${API_V1}/cloud/accounts/${id}/compliance/exceptions`,
+      payload,
+    ),
+  deleteComplianceException: (exceptionId: string) =>
+    del(`${API_V1}/cloud/compliance/exceptions/${exceptionId}`),
+
+  // ---- Phase 4: changes + EKS correlation ----
+  listCloudChanges: (id: string, riskOnly = false) =>
+    request<CloudChangeListResponse>(
+      `${API_V1}/cloud/accounts/${id}/changes${query({ risk_only: riskOnly ? "true" : undefined })}`,
+    ),
+  getEksCorrelation: (id: string, scanId?: string) =>
+    request<CloudEksResponse>(
+      `${API_V1}/cloud/accounts/${id}/eks-correlation${query({ scan_id: scanId })}`,
+    ),
+
+  // ---- Phase 4: cloud AI investigation ----
+  investigateCloud: (accountId: string, question: string) =>
+    postJson<InvestigationResult>(
+      `${API_V1}/ai/cloud/accounts/${accountId}/investigate`,
+      { question },
+    ),
 
   uploadScan,
 };

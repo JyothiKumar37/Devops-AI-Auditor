@@ -31,6 +31,16 @@ class NotificationEvent(str, Enum):
     READINESS_DECREASED = "readiness_decreased"
     NEW_VULNERABILITY = "new_vulnerability"
     REMEDIATION_COMPLETED = "remediation_completed"
+    CLOUD_CHANGE = "cloud_change"
+    # Phase 5: incident lifecycle events.
+    INCIDENT_CREATED = "incident_created"
+    INCIDENT_CRITICAL = "incident_critical"
+    INCIDENT_UNASSIGNED = "incident_unassigned"
+    INCIDENT_SEVERITY_CHANGED = "incident_severity_changed"
+    CONTAINMENT_APPROVAL_REQUESTED = "containment_approval_requested"
+    CONTAINMENT_FAILED = "containment_failed"
+    VERIFICATION_FAILED = "verification_failed"
+    INCIDENT_RESOLVED = "incident_resolved"
 
 
 ALL_EVENTS = [e.value for e in NotificationEvent]

@@ -202,11 +202,53 @@ class Settings(BaseSettings):
     # (enabled only by the test suite). Production keeps SSRF protection on.
     notifications_allow_private_hosts: bool = False
 
+    # ---- Phase 4: AWS cloud intelligence (read-only) ----
+    # Region used to call STS (AssumeRole). Global STS endpoint lives in us-east-1.
+    aws_sts_region: str = "us-east-1"
+    # Session name used for the AssumeRole call (shows up in CloudTrail).
+    aws_role_session_name: str = "devops-ai-auditor"
+    # Lifetime (seconds) of the assumed short-lived credentials (900-3600 typical).
+    aws_assume_role_duration: int = 3600
+    # Default regions discovered when an account does not specify its own.
+    aws_default_regions: str = "us-east-1"
+    # Max concurrent AWS API calls per sync (protects the worker + respects limits).
+    aws_max_concurrency: int = 4
+    # Hours between automatic cloud synchronizations (Celery beat). 0 disables.
+    aws_sync_interval_hours: int = 6
+    # WRITE/remediation cloud actions are DISABLED unless explicitly enabled.
+    # Even when enabled they still require per-action human approval.
+    cloud_write_enabled: bool = False
+
+    # ---- Phase 5: continuous security operations & incident response ----
+    # Master toggle for the security-ops subsystem (ingestion/correlation/incidents).
+    security_ops_enabled: bool = True
+    # Automatically create/update incidents from correlated events. When false,
+    # events are still ingested + correlated but incident creation is manual.
+    incident_auto_create: bool = True
+    # Time window (minutes) within which related events may be correlated into the
+    # same incident. Guards against folding unrelated events spread over long gaps.
+    incident_correlation_window_minutes: int = 1440
+    # Minutes between scheduled polls of AWS security sources (Celery beat). The
+    # internal sources (scan/cloud) are event-driven. 0 disables polling.
+    security_poll_interval_minutes: int = 15
+    # Retention (days) for normalized security events; 0 disables pruning.
+    security_event_retention_days: int = 90
+    # Max accepted inbound security-webhook payload size (bytes).
+    security_webhook_max_body_bytes: int = 1_000_000
+    # Allow replay of a security webhook within this many seconds (timestamp skew).
+    security_webhook_replay_window_seconds: int = 300
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def cors_origins_list(self) -> list[str]:
         """CORS origins parsed into a clean list."""
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def aws_default_regions_list(self) -> list[str]:
+        """Default AWS regions parsed into a clean list."""
+        return [r.strip() for r in self.aws_default_regions.split(",") if r.strip()]
 
     @property
     def cors_allow_wildcard(self) -> bool:

@@ -140,3 +140,15 @@ async def security_review(
     scan_id: uuid.UUID, service: AiSecurityReviewServiceDep
 ) -> AIReviewResponse:
     return AIReviewResponse.model_validate(await service.review_scan(scan_id))
+
+
+@router.post(
+    "/cloud/accounts/{account_id}/investigate",
+    response_model=InvestigationResponse,
+    summary="Investigate a cloud account with the AI agent (read-only, evidence-grounded)",
+)
+async def investigate_cloud(
+    account_id: uuid.UUID, body: InvestigationRequest, service: InvestigationServiceDep
+) -> InvestigationResponse:
+    result = await service.investigate_cloud(account_id, body.question)
+    return InvestigationResponse.model_validate(result.to_dict())

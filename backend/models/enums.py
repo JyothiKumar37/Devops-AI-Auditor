@@ -95,3 +95,94 @@ class ScannerType(str, Enum):
     ANSIBLE = "ansible"
     CONFIG = "config"
     SECRETS = "secrets"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: continuous security operations & incident response
+# ---------------------------------------------------------------------------
+
+
+class SecurityEventSourceType(str, Enum):
+    """Where a normalized security event originated.
+
+    Internal sources (repo/cloud scans, cloud changes) are produced by this
+    platform's own deterministic engines and are therefore independently
+    verified. External sources are reported by third parties and are treated as
+    untrusted until corroborated by a deterministic check.
+    """
+
+    # Internal (independently verified by our deterministic engines)
+    REPO_SCAN = "repo_scan"
+    CLOUD_SCAN = "cloud_scan"
+    CLOUD_CHANGE = "cloud_change"
+    # AWS native (externally reported; ingested via API/fixtures)
+    CLOUDTRAIL = "cloudtrail"
+    GUARDDUTY = "guardduty"
+    SECURITY_HUB = "security_hub"
+    CONFIG = "aws_config"
+    # Kubernetes / runtime
+    K8S_AUDIT = "k8s_audit"
+    FALCO = "falco"
+    # Pipeline / monitoring (webhook delivered)
+    CICD = "cicd"
+    ALERTMANAGER = "alertmanager"
+
+
+class SecurityEventCategory(str, Enum):
+    """Coarse classification of a security event for correlation + display."""
+
+    MISCONFIGURATION = "misconfiguration"
+    EXPOSURE = "exposure"
+    IDENTITY = "identity"
+    THREAT = "threat"
+    VULNERABILITY = "vulnerability"
+    COMPLIANCE = "compliance"
+    DRIFT = "drift"
+    PIPELINE = "pipeline"
+    RUNTIME = "runtime"
+    OTHER = "other"
+
+
+class SecurityEventStatus(str, Enum):
+    """Processing lifecycle of a normalized event."""
+
+    NEW = "new"
+    CORRELATED = "correlated"
+    IGNORED = "ignored"
+
+
+class IncidentStatus(str, Enum):
+    """Incident lifecycle. Transitions are validated on the backend."""
+
+    NEW = "new"
+    TRIAGING = "triaging"
+    INVESTIGATING = "investigating"
+    CONTAINMENT_PLANNED = "containment_planned"
+    CONTAINMENT_APPROVED = "containment_approved"
+    CONTAINED = "contained"
+    RESOLVED = "resolved"
+    FALSE_POSITIVE = "false_positive"
+    ACCEPTED_RISK = "accepted_risk"
+
+
+class ContainmentStatus(str, Enum):
+    """Lifecycle of a remediation/containment plan."""
+
+    PROPOSED = "proposed"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXECUTED = "executed"
+    FAILED = "failed"
+    VERIFIED = "verified"
+
+
+class ContainmentCapability(str, Enum):
+    """Capability class a containment action requires.
+
+    READ/PLAN are always safe. WRITE actions mutate infrastructure and are gated
+    behind ``cloud_write_enabled`` AND explicit human approval.
+    """
+
+    READ = "read"
+    PLAN = "plan"
+    WRITE = "write"

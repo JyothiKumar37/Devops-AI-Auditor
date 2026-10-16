@@ -27,6 +27,7 @@ dependencies = [
     "python-hcl2==4.3.5",
     "reportlab==4.2.5",
     "cryptography==44.0.0",
+    "boto3==1.43.109",
 ]
 
 [project.optional-dependencies]

@@ -4,7 +4,21 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/layout/AppShell";
 import AIInvestigation from "@/pages/AIInvestigation";
 import AuditLog from "@/pages/AuditLog";
+import CloudAccounts from "@/pages/CloudAccounts";
+import CloudAssets from "@/pages/CloudAssets";
+import CloudChanges from "@/pages/CloudChanges";
+import CloudCompliance from "@/pages/CloudCompliance";
+import CloudDrift from "@/pages/CloudDrift";
+import CloudEks from "@/pages/CloudEks";
+import CloudFindings from "@/pages/CloudFindings";
+import CloudInvestigate from "@/pages/CloudInvestigate";
+import CloudLayout from "@/pages/CloudLayout";
+import CloudNetwork from "@/pages/CloudNetwork";
+import CloudOverview from "@/pages/CloudOverview";
 import Dashboard from "@/pages/Dashboard";
+import IncidentDashboard from "@/pages/IncidentDashboard";
+import IncidentDetail from "@/pages/IncidentDetail";
+import IncidentList from "@/pages/IncidentList";
 import Dependencies from "@/pages/Dependencies";
 import FindingDetails from "@/pages/FindingDetails";
 import Findings from "@/pages/Findings";
@@ -49,6 +63,21 @@ export default function App() {
           <Route path="investigate" element={<AIInvestigation />} />
           <Route path="report" element={<ReportView />} />
         </Route>
+        <Route path="/cloud" element={<CloudAccounts />} />
+        <Route path="/cloud/:accountId" element={<CloudLayout />}>
+          <Route index element={<CloudOverview />} />
+          <Route path="assets" element={<CloudAssets />} />
+          <Route path="findings" element={<CloudFindings />} />
+          <Route path="network" element={<CloudNetwork />} />
+          <Route path="drift" element={<CloudDrift />} />
+          <Route path="compliance" element={<CloudCompliance />} />
+          <Route path="changes" element={<CloudChanges />} />
+          <Route path="eks" element={<CloudEks />} />
+          <Route path="investigate" element={<CloudInvestigate />} />
+        </Route>
+        <Route path="/incidents" element={<IncidentDashboard />} />
+        <Route path="/incidents/list" element={<IncidentList />} />
+        <Route path="/incidents/:incidentId" element={<IncidentDetail />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/pull-requests" element={<PullRequests />} />
         <Route path="/pull-requests/:prId" element={<PullRequestDetail />} />

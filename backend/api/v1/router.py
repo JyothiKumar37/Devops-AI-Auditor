@@ -7,13 +7,17 @@ from fastapi import APIRouter
 from api.v1.endpoints import (
     ai,
     audit,
+    cloud,
+    containment,
     health,
+    incidents,
     integrations,
     investigations,
     notifications,
     policies,
     pull_requests,
     scans,
+    security,
     settings,
     stats,
     webhooks,
@@ -32,3 +36,7 @@ api_router.include_router(pull_requests.router)
 api_router.include_router(policies.router)
 api_router.include_router(notifications.router)
 api_router.include_router(audit.router)
+api_router.include_router(cloud.router)
+api_router.include_router(security.router)
+api_router.include_router(incidents.router)
+api_router.include_router(containment.router)

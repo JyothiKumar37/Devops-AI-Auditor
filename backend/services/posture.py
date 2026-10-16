@@ -33,8 +33,15 @@ POSTURE_DOMAINS: list[tuple[str, str]] = [
     ("reliability", "Reliability"),
     ("secrets", "Secrets"),
     ("dependencies", "Dependencies"),
+    # Phase 4 cloud domains (applicable only when cloud findings are present).
+    ("cloud", "Cloud"),
+    ("iam", "IAM"),
+    ("network", "Network"),
 ]
 _DOMAIN_LABEL = dict(POSTURE_DOMAINS)
+
+# Cloud posture domains (subset of POSTURE_DOMAINS surfaced for a cloud account).
+CLOUD_DOMAINS = ("cloud", "network", "iam")
 
 # Scanner -> the domains its findings contribute to.
 _SCANNER_DOMAINS: dict[str, set[str]] = {
@@ -57,6 +64,16 @@ _SCANNER_DOMAINS: dict[str, set[str]] = {
     "helm-rules": {"kubernetes", "infrastructure"},
     "config-rules": {"infrastructure"},
     "dependency-scanner": {"dependencies", "security"},
+    # Phase 4 cloud scanners (only ever present for cloud posture, never repo scans).
+    "aws-ec2": {"cloud", "network"},
+    "aws-rds": {"cloud"},
+    "aws-s3": {"cloud"},
+    "aws-elb": {"cloud", "network"},
+    "aws-vpc": {"cloud", "network"},
+    "aws-eks": {"cloud"},
+    "aws-lambda": {"cloud"},
+    "aws-ecr": {"cloud"},
+    "aws-iam": {"cloud", "iam"},
 }
 
 # Finding category -> extra domains (cross-cutting lenses).

@@ -76,9 +76,24 @@ class ToolContext:
     authorized_scan_ids: frozenset[uuid.UUID] | None = None
     granted_permissions: frozenset[ToolPermission] = frozenset({ToolPermission.READ})
     repository_name: str | None = None
+    # Phase 4: cloud-account scope. None means "no account restriction"; otherwise a
+    # tool argument named ``account_id`` must be within this set (mirrors scan scope).
+    authorized_account_ids: frozenset[uuid.UUID] | None = None
+    # Phase 5: incident scope. None means "no incident restriction"; otherwise a
+    # tool argument named ``incident_id`` must be within this set.
+    authorized_incident_ids: frozenset[uuid.UUID] | None = None
 
     def authorizes_scan(self, scan_id: uuid.UUID) -> bool:
         return self.authorized_scan_ids is None or scan_id in self.authorized_scan_ids
+
+    def authorizes_account(self, account_id: uuid.UUID) -> bool:
+        return self.authorized_account_ids is None or account_id in self.authorized_account_ids
+
+    def authorizes_incident(self, incident_id: uuid.UUID) -> bool:
+        return (
+            self.authorized_incident_ids is None
+            or incident_id in self.authorized_incident_ids
+        )
 
 
 @dataclass(slots=True)
@@ -137,6 +152,20 @@ class InvestigationTool(ABC):
         if isinstance(scan_id, uuid.UUID) and not ctx.authorizes_scan(scan_id):
             raise ToolError(
                 f"Scan {scan_id} is outside this investigation's authorized scope.",
+                code="unauthorized",
+            )
+        # Likewise, any argument named account_id must be within the cloud scope.
+        account_id = getattr(args, "account_id", None)
+        if isinstance(account_id, uuid.UUID) and not ctx.authorizes_account(account_id):
+            raise ToolError(
+                f"Account {account_id} is outside this investigation's authorized scope.",
+                code="unauthorized",
+            )
+        # And any argument named incident_id must be within the incident scope.
+        incident_id = getattr(args, "incident_id", None)
+        if isinstance(incident_id, uuid.UUID) and not ctx.authorizes_incident(incident_id):
+            raise ToolError(
+                f"Incident {incident_id} is outside this investigation's authorized scope.",
                 code="unauthorized",
             )
 

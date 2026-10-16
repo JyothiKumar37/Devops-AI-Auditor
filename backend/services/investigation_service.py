@@ -73,6 +73,82 @@ class InvestigationService:
                             finding_id=finding_id, repository_name=repo or "")
         return result
 
+    async def investigate_cloud(
+        self, account_pk: uuid.UUID, question: str
+    ) -> InvestigationResult:
+        from models.cloud import CloudAccount
+
+        account = await self._session.get(CloudAccount, account_pk)
+        if account is None:
+            raise NotFoundError(f"Cloud account {account_pk} not found.")
+        engine = await InvestigationEngine.build(
+            self._session, self._settings, account_id=account_pk,
+        )
+        prefix = (
+            f"Investigate AWS account {account.account_id} (scope: account {account_pk}). "
+        )
+        result = await engine.investigate(prefix + self._clean_question(question))
+        await self._persist(
+            result, scope="cloud", repository_name=f"aws:{account.account_id}"
+        )
+        return result
+
+    async def investigate_incident(
+        self, incident_id: uuid.UUID, question: str
+    ) -> InvestigationResult:
+        from agents.investigation.tools.registry import incident_registry
+        from models.incident import Incident, IncidentInvestigation
+
+        incident = await self._session.get(Incident, incident_id)
+        if incident is None:
+            raise NotFoundError(f"Incident {incident_id} not found.")
+        engine = await InvestigationEngine.build(
+            self._session,
+            self._settings,
+            incident_id=incident_id,
+            account_id=incident.cloud_account_id,
+            registry=incident_registry(),
+        )
+        prefix = (
+            f"Investigate security incident {incident_id} "
+            f"(status {incident.status}, severity {incident.severity}). "
+            "Use the incident tools to gather its events, timeline and resources, "
+            "then cloud tools for deeper evidence. Distinguish confirmed facts from "
+            "hypotheses. "
+        )
+        result = await engine.investigate(prefix + self._clean_question(question))
+        row = IncidentInvestigation(
+            id=uuid.uuid4(),
+            incident_id=incident_id,
+            question=result.question,
+            answer=result.answer,
+            root_cause=result.root_cause,
+            impact=result.impact,
+            confidence=result.confidence,
+            recommendations=result.recommendations,
+            citations=result.citations,
+            evidence=result.evidence,
+            trace=result.trace,
+            ai_used=result.ai_used,
+            tool_calls=result.tool_calls,
+            hallucination_guard_triggered=result.hallucination_guard_triggered,
+        )
+        self._session.add(row)
+        await self._session.flush()
+        result.investigation_id = str(row.id)
+        return result
+
+    async def list_incident_investigations(self, incident_id: uuid.UUID):  # type: ignore[no-untyped-def]
+        from models.incident import IncidentInvestigation
+
+        return (
+            await self._session.scalars(
+                select(IncidentInvestigation)
+                .where(IncidentInvestigation.incident_id == incident_id)
+                .order_by(IncidentInvestigation.created_at.desc())
+            )
+        ).all()
+
     async def investigate_repository(
         self, repository_name: str, question: str
     ) -> InvestigationResult:

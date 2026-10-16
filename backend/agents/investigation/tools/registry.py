@@ -55,7 +55,12 @@ def default_registry() -> ToolRegistry:
     Imported lazily so the registry module stays import-cycle free and tests can
     build a registry with a subset of tools.
     """
-    from agents.investigation.tools import analysis_tools, finding_tools, scan_tools
+    from agents.investigation.tools import (
+        analysis_tools,
+        cloud_tools,
+        finding_tools,
+        scan_tools,
+    )
 
     return ToolRegistry(
         [
@@ -70,5 +75,36 @@ def default_registry() -> ToolRegistry:
             analysis_tools.GetScanDiffTool(),
             analysis_tools.GetFileTool(),
             analysis_tools.SearchRepositoryTool(),
+            # Phase 4 cloud tools (read-only, account-scoped, secret-redacted).
+            cloud_tools.ListCloudAccountsTool(),
+            cloud_tools.GetCloudAssetsTool(),
+            cloud_tools.GetCloudResourceTool(),
+            cloud_tools.GetCloudFindingsTool(),
+            cloud_tools.GetCloudPostureTool(),
+            cloud_tools.GetNetworkGraphTool(),
+            cloud_tools.GetIamAnalysisTool(),
+            cloud_tools.GetDriftTool(),
+            cloud_tools.GetComplianceStatusTool(),
         ]
     )
+
+
+def incident_registry() -> ToolRegistry:
+    """Registry for incident investigations: incident tools + all cloud/scan tools.
+
+    An incident spans cloud resources, so the Phase 4 cloud tools are included and
+    authorized for the incident's cloud account; the incident tools add the
+    event/timeline/containment evidence specific to the incident.
+    """
+    from agents.investigation.tools import incident_tools
+
+    registry = default_registry()
+    for tool in (
+        incident_tools.GetIncidentTool(),
+        incident_tools.SearchSecurityEventsTool(),
+        incident_tools.GetSecurityEventTool(),
+        incident_tools.GetIncidentTimelineTool(),
+        incident_tools.GetRemediationHistoryTool(),
+    ):
+        registry.register(tool)
+    return registry

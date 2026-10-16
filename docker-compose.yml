@@ -92,6 +92,29 @@ services:
       SMTP_FROM: ${SMTP_FROM:-devops-auditor@localhost}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       NOTIFICATIONS_ALLOW_PRIVATE_HOSTS: ${NOTIFICATIONS_ALLOW_PRIVATE_HOSTS:-false}
+      # Phase 4: cloud (AWS) runtime intelligence - read-only, STS AssumeRole.
+      AWS_STS_REGION: ${AWS_STS_REGION:-us-east-1}
+      AWS_ROLE_SESSION_NAME: ${AWS_ROLE_SESSION_NAME:-devops-ai-auditor}
+      AWS_ASSUME_ROLE_DURATION: ${AWS_ASSUME_ROLE_DURATION:-3600}
+      AWS_DEFAULT_REGIONS: ${AWS_DEFAULT_REGIONS:-us-east-1}
+      AWS_MAX_CONCURRENCY: ${AWS_MAX_CONCURRENCY:-4}
+      AWS_SYNC_INTERVAL_HOURS: ${AWS_SYNC_INTERVAL_HOURS:-6}
+      CLOUD_WRITE_ENABLED: ${CLOUD_WRITE_ENABLED:-false}
+      # The platform's OWN base identity used to call sts:AssumeRole. In AWS this
+      # comes from the task role / instance profile; locally, pass these through.
+      # No per-account keys are ever stored - only short-lived assumed creds.
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Phase 5: continuous security operations & incident response.
+      SECURITY_OPS_ENABLED: ${SECURITY_OPS_ENABLED:-true}
+      INCIDENT_AUTO_CREATE: ${INCIDENT_AUTO_CREATE:-true}
+      INCIDENT_CORRELATION_WINDOW_MINUTES: ${INCIDENT_CORRELATION_WINDOW_MINUTES:-1440}
+      SECURITY_POLL_INTERVAL_MINUTES: ${SECURITY_POLL_INTERVAL_MINUTES:-15}
+      SECURITY_EVENT_RETENTION_DAYS: ${SECURITY_EVENT_RETENTION_DAYS:-90}
+      SECURITY_WEBHOOK_MAX_BODY_BYTES: ${SECURITY_WEBHOOK_MAX_BODY_BYTES:-1000000}
+      SECURITY_WEBHOOK_REPLAY_WINDOW_SECONDS: ${SECURITY_WEBHOOK_REPLAY_WINDOW_SECONDS:-300}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -107,7 +130,9 @@ services:
       context: .
       dockerfile: docker/backend.Dockerfile
     restart: unless-stopped
-    command: ["celery", "-A", "workers.celery_app.celery_app", "worker", "--loglevel=info"]
+    # -B runs the embedded beat scheduler alongside the worker so Phase 4's
+    # periodic cloud synchronization (gated by AWS_SYNC_INTERVAL_HOURS) fires.
+    command: ["celery", "-A", "workers.celery_app.celery_app", "worker", "--beat", "--loglevel=info"]
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -144,6 +169,28 @@ services:
       SMTP_FROM: ${SMTP_FROM:-devops-auditor@localhost}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       NOTIFICATIONS_ALLOW_PRIVATE_HOSTS: ${NOTIFICATIONS_ALLOW_PRIVATE_HOSTS:-false}
+      # Phase 4: the worker runs scheduled cloud syncs (Celery beat), so it needs
+      # the same read-only AWS/STS configuration and base identity as the backend.
+      AWS_STS_REGION: ${AWS_STS_REGION:-us-east-1}
+      AWS_ROLE_SESSION_NAME: ${AWS_ROLE_SESSION_NAME:-devops-ai-auditor}
+      AWS_ASSUME_ROLE_DURATION: ${AWS_ASSUME_ROLE_DURATION:-3600}
+      AWS_DEFAULT_REGIONS: ${AWS_DEFAULT_REGIONS:-us-east-1}
+      AWS_MAX_CONCURRENCY: ${AWS_MAX_CONCURRENCY:-4}
+      AWS_SYNC_INTERVAL_HOURS: ${AWS_SYNC_INTERVAL_HOURS:-6}
+      CLOUD_WRITE_ENABLED: ${CLOUD_WRITE_ENABLED:-false}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Phase 5: the worker runs security ingestion + the scheduled poll/correlate/
+      # prune sweep (Celery beat), so it needs the same security-ops configuration.
+      SECURITY_OPS_ENABLED: ${SECURITY_OPS_ENABLED:-true}
+      INCIDENT_AUTO_CREATE: ${INCIDENT_AUTO_CREATE:-true}
+      INCIDENT_CORRELATION_WINDOW_MINUTES: ${INCIDENT_CORRELATION_WINDOW_MINUTES:-1440}
+      SECURITY_POLL_INTERVAL_MINUTES: ${SECURITY_POLL_INTERVAL_MINUTES:-15}
+      SECURITY_EVENT_RETENTION_DAYS: ${SECURITY_EVENT_RETENTION_DAYS:-90}
+      SECURITY_WEBHOOK_MAX_BODY_BYTES: ${SECURITY_WEBHOOK_MAX_BODY_BYTES:-1000000}
+      SECURITY_WEBHOOK_REPLAY_WINDOW_SECONDS: ${SECURITY_WEBHOOK_REPLAY_WINDOW_SECONDS:-300}
     volumes:
       - workspaces:/workspaces
     depends_on:

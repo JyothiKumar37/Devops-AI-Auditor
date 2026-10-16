@@ -20,13 +20,23 @@ from core.database import Database
 from core.redis import RedisClient
 from services.ai_pr_review_service import AiPrReviewService
 from services.ai_security_review_service import AiSecurityReviewService
+from services.cloud_account_service import CloudAccountService
+from services.cloud_discovery_service import CloudDiscoveryService
+from services.cloud_drift_service import CloudDriftService
+from services.cloud_graph_service import CloudGraphService
+from services.cloud_kubernetes_service import CloudKubernetesService
+from services.cloud_posture_service import CloudPostureService
+from services.compliance_service import ComplianceService
+from services.containment_service import ContainmentService
 from services.health_service import HealthService
+from services.incident_service import IncidentService
 from services.integration_service import IntegrationService
 from services.investigation_service import InvestigationService
 from services.remediation_plan_service import RemediationPlanService
 from services.remediation_service import RemediationService
 from services.report import ReportService
 from services.scan_service import ScanService
+from services.security_service import SecurityService
 from services.suppression_service import SuppressionService
 
 
@@ -155,3 +165,101 @@ def get_ai_security_review_service(
 AiSecurityReviewServiceDep = Annotated[
     AiSecurityReviewService, Depends(get_ai_security_review_service)
 ]
+
+
+def get_cloud_account_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudAccountService:
+    return CloudAccountService(session=session, settings=settings)
+
+
+CloudAccountServiceDep = Annotated[
+    CloudAccountService, Depends(get_cloud_account_service)
+]
+
+
+def get_cloud_discovery_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudDiscoveryService:
+    return CloudDiscoveryService(session=session, settings=settings)
+
+
+CloudDiscoveryServiceDep = Annotated[
+    CloudDiscoveryService, Depends(get_cloud_discovery_service)
+]
+
+
+def get_cloud_posture_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudPostureService:
+    return CloudPostureService(session=session, settings=settings)
+
+
+CloudPostureServiceDep = Annotated[
+    CloudPostureService, Depends(get_cloud_posture_service)
+]
+
+
+def get_cloud_graph_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudGraphService:
+    return CloudGraphService(session=session, settings=settings)
+
+
+CloudGraphServiceDep = Annotated[CloudGraphService, Depends(get_cloud_graph_service)]
+
+
+def get_cloud_drift_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudDriftService:
+    return CloudDriftService(session=session, settings=settings)
+
+
+CloudDriftServiceDep = Annotated[CloudDriftService, Depends(get_cloud_drift_service)]
+
+
+def get_cloud_kubernetes_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> CloudKubernetesService:
+    return CloudKubernetesService(session=session, settings=settings)
+
+
+CloudKubernetesServiceDep = Annotated[
+    CloudKubernetesService, Depends(get_cloud_kubernetes_service)
+]
+
+
+def get_compliance_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> ComplianceService:
+    return ComplianceService(session=session, settings=settings)
+
+
+ComplianceServiceDep = Annotated[ComplianceService, Depends(get_compliance_service)]
+
+
+def get_security_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> SecurityService:
+    return SecurityService(session=session, settings=settings)
+
+
+SecurityServiceDep = Annotated[SecurityService, Depends(get_security_service)]
+
+
+def get_incident_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> IncidentService:
+    return IncidentService(session=session, settings=settings)
+
+
+IncidentServiceDep = Annotated[IncidentService, Depends(get_incident_service)]
+
+
+def get_containment_service(
+    session: DbSessionDep, settings: SettingsDep
+) -> ContainmentService:
+    return ContainmentService(session=session, settings=settings)
+
+
+ContainmentServiceDep = Annotated[ContainmentService, Depends(get_containment_service)]

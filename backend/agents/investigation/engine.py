@@ -101,6 +101,8 @@ class InvestigationEngine:
         *,
         scan_id: uuid.UUID | None = None,
         repository_name: str | None = None,
+        account_id: uuid.UUID | None = None,
+        incident_id: uuid.UUID | None = None,
         registry: ToolRegistry | None = None,
         provider: LLMProvider | None = None,
     ) -> InvestigationEngine:
@@ -113,6 +115,8 @@ class InvestigationEngine:
             authorized_scan_ids=frozenset({scan_id}) if scan_id else None,
             granted_permissions=frozenset({ToolPermission.READ}),
             repository_name=repository_name,
+            authorized_account_ids=frozenset({account_id}) if account_id else None,
+            authorized_incident_ids=frozenset({incident_id}) if incident_id else None,
         )
         return cls(resolved, prov, registry or default_registry(), ctx)
 
@@ -335,6 +339,10 @@ class InvestigationEngine:
     # ---- helpers -----------------------------------------------------------
 
     def _scope_hint(self) -> str:
+        if self._ctx.authorized_incident_ids:
+            return f"incident(s) {sorted(str(i) for i in self._ctx.authorized_incident_ids)}"
+        if self._ctx.authorized_account_ids:
+            return f"cloud account(s) {sorted(str(a) for a in self._ctx.authorized_account_ids)}"
         if self._ctx.authorized_scan_ids:
             return f"scan(s) {sorted(str(s) for s in self._ctx.authorized_scan_ids)}"
         if self._ctx.repository_name:
@@ -441,6 +449,8 @@ def _collect_refs(data: Any, finding_ids: set[str], files: set[str]) -> None:
         for key, value in data.items():
             if key == "finding_id" and isinstance(value, str):
                 finding_ids.add(value)
+            elif key == "related_finding_ids" and isinstance(value, list):
+                finding_ids.update(v for v in value if isinstance(v, str))
             elif key in {"file", "path"} and isinstance(value, str) and value:
                 files.add(value)
             else:
